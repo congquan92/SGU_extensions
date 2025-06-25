@@ -269,16 +269,16 @@ function predictButton(){
         setStatus('Vui lòng nhập số tín chỉ ngành hợp lệ.', 'error');
         remainingCredits.textContent = "0";
         return;
-    }
+    }        
     
     // Lấy dữ liệu hiện tại
     const currentCredits = parseFloat(currentTinChi) || 0;
     const currentGPA = parseFloat(currentDTB4) || 0;
     
     // Tính số tín chỉ còn lại
-    const remaining = totalMajorCredits - currentCredits;
+    const remaining = Math.max(0, totalMajorCredits - currentCredits);
     remainingCredits.textContent = remaining.toString();
-    
+
     // Tính tổng điểm hiện tại
     const currentTotalPoints = currentCredits * currentGPA;
     
@@ -300,6 +300,14 @@ function predictButton(){
     
     let resultHTML = "";
     
+    // Kiểm tra nếu điểm trung bình hiện tại hoặc số tín chỉ không hợp lệ
+    if (isNaN(currentGPA) || isNaN(currentCredits) || currentCredits <= 0) {
+        resultHTML = `<p>⚠️ <strong>Lỗi:</strong> Dữ liệu điểm hiện tại không hợp lệ. Vui lòng tải dữ liệu điểm trước khi dự đoán.</p>`;
+        statusPredict.innerHTML = resultHTML;
+        setStatus('Dữ liệu điểm hiện tại không hợp lệ', 'error');
+        return;
+    }
+    
     // Phân tích kết quả đạt GIỎI
     if (currentGPA >= targetGioi) {
         resultHTML += `<p>💚 <strong>Giỏi:</strong> Bạn đã đạt đủ điều kiện xếp loại Giỏi với ĐTB hiện tại ${currentGPA.toFixed(2)}</p>`;
@@ -310,7 +318,7 @@ function predictButton(){
         const creditsA = Math.ceil((pointsNeededForGioi - remaining * 3.0) / 1.0);
         const creditsB = remaining - creditsA;
         
-        if (creditsA <= remaining) {
+        if (creditsA <= remaining && creditsA >= 0) {
             // Tính GPA dự kiến khi đạt được số tín A và B theo đề xuất
             const expectedPointsWithAB = currentTotalPoints + (creditsA * 4.0) + (creditsB * 3.0);
             const expectedGPAGioi = (expectedPointsWithAB / totalMajorCredits).toFixed(2);
@@ -318,25 +326,137 @@ function predictButton(){
             resultHTML += `<p>✅ <strong>Giỏi:</strong> Cần ĐTB ${avgNeededForGioi.toFixed(2)} cho ${remaining} tín còn lại.<br>
             → Cụ thể: <span style="color:blue">${creditsA} tín A</span> và <span style="color:blue">${creditsB} tín B</span><br>
             → GPA dự kiến: <strong>${expectedGPAGioi}</strong></p>`;
+        } else {
+            // Trường hợp số lượng tín chỉ A cần nhiều hơn tín chỉ còn lại hoặc âm
+            resultHTML += `<p>⚠️ <strong>Giỏi:</strong> Số liệu không hợp lệ. Vui lòng kiểm tra lại thông tin điểm và tín chỉ.</p>`;
         }
     } else {
         // Cần cải thiện điểm cũ
         const maxPointsFromRemaining = remaining * 4.0; // Nếu tất cả A
         const stillNeeded = pointsNeededForGioi - maxPointsFromRemaining;
-        const improveD = Math.ceil(stillNeeded / 3.0); // D→A: +3 điểm/tín
-        const improveC = Math.ceil(stillNeeded / 2.0); // C→A: +2 điểm/tín
-        const improveB = Math.ceil(stillNeeded / 1.0); // B→A: +1 điểm/tín
         
-        // Tính GPA dự kiến nếu đạt được tất cả điều kiện cải thiện
-        const expectedPointsAfterImprovement = currentTotalPoints + maxPointsFromRemaining + stillNeeded;
-        const expectedGPAGioi = (expectedPointsAfterImprovement / totalMajorCredits).toFixed(2);
-        
-        resultHTML += `<p>⚠️ <strong>Giỏi:</strong> Cần đạt A cho tất cả ${remaining} tín còn lại<br>
-        → <strong>VÀ</strong> cải thiện một trong những trường hợp sau:<br>
-        <span style="color:red">${improveD} tín D → A</span>, hoặc<br>
-        <span style="color:orange">${improveC} tín C → A</span>, hoặc<br>
-        <span style="color:blue">${improveB} tín B → A</span><br>
-        → GPA dự kiến sau cải thiện: <strong>${expectedGPAGioi}</strong></p>`;
+        if (stillNeeded > 0) {
+            const improveD = Math.ceil(stillNeeded / 3.0); // D→A: +3 điểm/tín
+            const improveC = Math.ceil(stillNeeded / 2.0); // C→A: +2 điểm/tín
+            const improveB = Math.ceil(stillNeeded / 1.0); // B→A: +1 điểm/tín
+            
+            // Tính GPA dự kiến nếu đạt được tất cả điều kiện cải thiện
+            const expectedPointsAfterImprovement = currentTotalPoints + maxPointsFromRemaining + stillNeeded;
+            const expectedGPAGioi = (expectedPointsAfterImprovement / totalMajorCredits).toFixed(2);
+            
+            // Lấy số tín chỉ thực tế từ UI
+            const totalD = parseInt(document.getElementById('totalD').textContent) || 0;
+            const totalC = parseInt(document.getElementById('totalC').textContent) || 0;
+            const totalB = parseInt(document.getElementById('totalB').textContent) || 0;
+            
+            // Tạo mảng phương án cải thiện khả thi và mảng cảnh báo
+            let viableOptions = [];
+            let improvementWarnings = [];
+            
+            // Phương án 1: Cải thiện D → A
+            if (totalD > 0) {
+                if (improveD <= totalD) {
+                    viableOptions.push(`<span style="color:red">${improveD} tín D → A</span>`);
+                } else {
+                    // Cải thiện tất cả D hiện có + thêm tín chỉ khác
+                    const remainingAfterAllD = stillNeeded - (totalD * 3.0);
+                    
+                    // Kiểm tra nếu vẫn cần thêm điểm sau khi cải thiện hết D
+                    if (remainingAfterAllD > 0) {
+                        // Tính số tín chỉ C cần cải thiện sau khi đã dùng hết D
+                        const neededC = Math.ceil(remainingAfterAllD / 2.0);
+                        if (neededC <= totalC) {
+                            viableOptions.push(`<span style="color:red">TẤT CẢ ${totalD} tín D → A</span> <strong>VÀ</strong> <span style="color:orange">${neededC} tín C → A</span>`);
+                        }
+                        
+                        // Tính số tín chỉ B cần cải thiện sau khi đã dùng hết D
+                        const neededB = Math.ceil(remainingAfterAllD / 1.0);
+                        if (neededB <= totalB) {
+                            viableOptions.push(`<span style="color:red">TẤT CẢ ${totalD} tín D → A</span> <strong>VÀ</strong> <span style="color:blue">${neededB} tín B → A</span>`);
+                        }
+                    }
+                    
+                    improvementWarnings.push(`<br>⚠️ Bạn chỉ có ${totalD} tín D (thiếu ${improveD - totalD} tín để đạt mục tiêu)`);
+                }
+            } else if (improveD > 0) {
+                improvementWarnings.push(`<br>⚠️ Bạn không có tín chỉ D để cải thiện`);
+            }
+            
+            // Phương án 2: Cải thiện C → A
+            if (totalC > 0) {
+                if (improveC <= totalC) {
+                    viableOptions.push(`<span style="color:orange">${improveC} tín C → A</span>`);
+                } else {
+                    // Cải thiện tối đa C hiện có + thêm tín chỉ khác
+                    const remainingAfterMaxC = stillNeeded - (totalC * 2.0);
+                    
+                    // Kiểm tra nếu vẫn cần thêm điểm sau khi cải thiện tối đa C
+                    if (remainingAfterMaxC > 0 && totalB > 0) {
+                        const neededB = Math.ceil(remainingAfterMaxC / 1.0);
+                        if (neededB <= totalB) {
+                            viableOptions.push(`<span style="color:orange">TẤT CẢ ${totalC} tín C → A</span> <strong>VÀ</strong> <span style="color:blue">${neededB} tín B → A</span>`);
+                        }
+                    }
+                    
+                    improvementWarnings.push(`<br>⚠️ Bạn chỉ có ${totalC} tín C (cần ${improveC})`);
+                }
+            } else if (improveC > 0) {
+                improvementWarnings.push(`<br>⚠️ Bạn không có tín chỉ C để cải thiện`);
+            }
+            
+            // Phương án 3: Cải thiện B → A
+            if (totalB > 0) {
+                if (improveB <= totalB) {
+                    viableOptions.push(`<span style="color:blue">${improveB} tín B → A</span>`);
+                } else {
+                    improvementWarnings.push(`<br>⚠️ Bạn chỉ có ${totalB} tín B (thiếu ${improveB - totalB} tín để đạt mục tiêu)`);
+                }
+            } else if (improveB > 0) {
+                improvementWarnings.push(`<br>⚠️ Bạn không có tín chỉ B để cải thiện`);
+            }
+            
+            // Phương án 4: Kết hợp nhiều loại để tối ưu hóa (ưu tiên cải thiện D trước)
+            if (totalD > 0 && totalC > 0 && improveD > totalD) {
+                const pointsFromD = totalD * 3.0;
+                const remainingPoints = stillNeeded - pointsFromD;
+                const neededC = Math.ceil(Math.min(remainingPoints / 2.0, totalC));
+                const pointsFromC = neededC * 2.0;
+                
+                if (remainingPoints - pointsFromC > 0 && totalB > 0) {
+                    const neededB = Math.ceil((remainingPoints - pointsFromC) / 1.0);
+                    if (neededB <= totalB) {
+                        viableOptions.push(`<span style="color:red">TẤT CẢ ${totalD} tín D → A</span> <strong>VÀ</strong> <span style="color:orange">${neededC} tín C → A</span> <strong>VÀ</strong> <span style="color:blue">${neededB} tín B → A</span>`);
+                    }
+                }
+            }
+            
+            // Tính toán GPA tối đa có thể đạt khi sử dụng tất cả tín còn lại để học A
+            // và cải thiện tất cả D, C và B nếu cần
+            const allRemainingAsA = remaining * 4.0;
+            const allD = totalD * 3.0; // Cải thiện từ 1.0 lên 4.0
+            const allC = totalC * 2.0; // Cải thiện từ 2.0 lên 4.0
+            const allB = totalB * 1.0; // Cải thiện từ 3.0 lên 4.0
+            
+            const maxPossiblePoints = currentTotalPoints + allRemainingAsA + allD + allC + allB;
+            const maxPossibleGPA = (maxPossiblePoints / totalMajorCredits).toFixed(2);
+            
+            // Hiển thị kết quả dựa trên các phương án khả thi
+            if (viableOptions.length === 0) {
+                resultHTML += `<p>❌ <strong>Giỏi:</strong> Không thể đạt Giỏi với số tín chỉ hiện có.<br>
+                → Cần đạt A cho tất cả ${remaining} tín còn lại và cải thiện các môn cũ, nhưng:<br>
+                ${improvementWarnings.join('')}<br>
+                → GPA tối đa có thể đạt: <strong>${maxPossibleGPA}</strong></p>`;
+            } else {
+                resultHTML += `<p>⚠️ <strong>Giỏi:</strong> Cần đạt A cho tất cả ${remaining} tín còn lại<br>
+                → <strong>VÀ</strong> cải thiện một trong những trường hợp sau:<br>
+                ${viableOptions.join(', hoặc<br>')}<br>
+                → GPA dự kiến sau cải thiện: <strong>${expectedGPAGioi}</strong>
+                ${improvementWarnings.join('')}</p>`;
+            }
+        } else {
+            // Trường hợp tính toán không đúng hoặc dữ liệu không hợp lệ
+            resultHTML += `<p>⚠️ <strong>Giỏi:</strong> Có lỗi khi tính toán. Vui lòng kiểm tra dữ liệu đầu vào.</p>`;
+        }
     }
     
     // Phân tích kết quả đạt XUẤT SẮC
@@ -359,31 +479,144 @@ function predictButton(){
             const creditsA = Math.ceil((pointsNeededForXuatsac - remaining * 3.0) / 1.0);
             const creditsB = remaining - creditsA;
             
-            // Tính GPA dự kiến
-            const expectedPointsWithAB = currentTotalPoints + (creditsA * 4.0) + (creditsB * 3.0);
-            const expectedGPAXuatSac = (expectedPointsWithAB / totalMajorCredits).toFixed(2);
-            
-            resultHTML += `→ Cụ thể: <span style="color:blue">${creditsA} tín A</span> và <span style="color:blue">${creditsB} tín B</span><br>
-            → GPA dự kiến: <strong>${expectedGPAXuatSac}</strong></p>`;
+            if (creditsA <= remaining && creditsA >= 0) {
+                // Tính GPA dự kiến
+                const expectedPointsWithAB = currentTotalPoints + (creditsA * 4.0) + (creditsB * 3.0);
+                const expectedGPAXuatSac = (expectedPointsWithAB / totalMajorCredits).toFixed(2);
+                
+                resultHTML += `→ Cụ thể: <span style="color:blue">${creditsA} tín A</span> và <span style="color:blue">${creditsB} tín B</span><br>
+                → GPA dự kiến: <strong>${expectedGPAXuatSac}</strong></p>`;
+            } else {
+                resultHTML += `→ Số liệu không hợp lệ. Vui lòng kiểm tra lại thông tin điểm và tín chỉ.</p>`;
+            }
         }
     } else {
         // Cần cải thiện điểm cũ
         const maxPointsFromRemaining = remaining * 4.0; // Nếu tất cả A
         const stillNeeded = pointsNeededForXuatsac - maxPointsFromRemaining;
-        const improveD = Math.ceil(stillNeeded / 3.0); // D→A: +3 điểm/tín
-        const improveC = Math.ceil(stillNeeded / 2.0); // C→A: +2 điểm/tín
-        const improveB = Math.ceil(stillNeeded / 1.0); // B→A: +1 điểm/tín
         
-        // Tính GPA dự kiến nếu đạt được tất cả điều kiện cải thiện
-        const expectedPointsAfterImprovement = currentTotalPoints + maxPointsFromRemaining + stillNeeded;
-        const expectedGPAXuatSac = (expectedPointsAfterImprovement / totalMajorCredits).toFixed(2);
-        
-        resultHTML += `<p>⚠️ <strong>Xuất sắc:</strong> Cần đạt A cho <strong>TẤT CẢ</strong> ${remaining} tín còn lại<br>
-        → <strong>VÀ</strong> cải thiện một trong những trường hợp sau:<br>
-        <span style="color:red">${improveD} tín D → A</span>, hoặc<br>
-        <span style="color:orange">${improveC} tín C → A</span>, hoặc<br>
-        <span style="color:blue">${improveB} tín B → A</span><br>
-        → GPA dự kiến sau cải thiện: <strong>${expectedGPAXuatSac}</strong></p>`;
+        if (stillNeeded > 0) {
+            const improveD = Math.ceil(stillNeeded / 3.0); // D→A: +3 điểm/tín
+            const improveC = Math.ceil(stillNeeded / 2.0); // C→A: +2 điểm/tín
+            const improveB = Math.ceil(stillNeeded / 1.0); // B→A: +1 điểm/tín
+            
+            // Tính GPA dự kiến nếu đạt được tất cả điều kiện cải thiện
+            const expectedPointsAfterImprovement = currentTotalPoints + maxPointsFromRemaining + stillNeeded;
+            const expectedGPAXuatSac = (expectedPointsAfterImprovement / totalMajorCredits).toFixed(2);
+            
+            // Lấy số tín chỉ thực tế từ UI
+            const totalD = parseInt(document.getElementById('totalD').textContent) || 0;
+            const totalC = parseInt(document.getElementById('totalC').textContent) || 0;
+            const totalB = parseInt(document.getElementById('totalB').textContent) || 0;
+            
+            // Tạo mảng phương án cải thiện khả thi và mảng cảnh báo
+            let viableOptions = [];
+            let improvementWarnings = [];
+            
+            // Phương án 1: Cải thiện D → A
+            if (totalD > 0) {
+                if (improveD <= totalD) {
+                    viableOptions.push(`<span style="color:red">${improveD} tín D → A</span>`);
+                } else {
+                    // Cải thiện tất cả D hiện có + thêm tín chỉ khác
+                    const remainingAfterAllD = stillNeeded - (totalD * 3.0);
+                    
+                    // Kiểm tra nếu vẫn cần thêm điểm sau khi cải thiện hết D
+                    if (remainingAfterAllD > 0) {
+                        // Tính số tín chỉ C cần cải thiện sau khi đã dùng hết D
+                        const neededC = Math.ceil(remainingAfterAllD / 2.0);
+                        if (neededC <= totalC) {
+                            viableOptions.push(`<span style="color:red">TẤT CẢ ${totalD} tín D → A</span> <strong>VÀ</strong> <span style="color:orange">${neededC} tín C → A</span>`);
+                        }
+                        
+                        // Tính số tín chỉ B cần cải thiện sau khi đã dùng hết D
+                        const neededB = Math.ceil(remainingAfterAllD / 1.0);
+                        if (neededB <= totalB) {
+                            viableOptions.push(`<span style="color:red">TẤT CẢ ${totalD} tín D → A</span> <strong>VÀ</strong> <span style="color:blue">${neededB} tín B → A</span>`);
+                        }
+                    }
+                    
+                    improvementWarnings.push(`<br>⚠️ Bạn chỉ có ${totalD} tín D (thiếu ${improveD - totalD} tín để đạt mục tiêu)`);
+                }
+            } else if (improveD > 0) {
+                improvementWarnings.push(`<br>⚠️ Bạn không có tín chỉ D để cải thiện`);
+            }
+            
+            // Phương án 2: Cải thiện C → A
+            if (totalC > 0) {
+                if (improveC <= totalC) {
+                    viableOptions.push(`<span style="color:orange">${improveC} tín C → A</span>`);
+                } else {
+                    // Cải thiện tối đa C hiện có + thêm tín chỉ khác
+                    const remainingAfterMaxC = stillNeeded - (totalC * 2.0);
+                    
+                    // Kiểm tra nếu vẫn cần thêm điểm sau khi cải thiện tối đa C
+                    if (remainingAfterMaxC > 0 && totalB > 0) {
+                        const neededB = Math.ceil(remainingAfterMaxC / 1.0);
+                        if (neededB <= totalB) {
+                            viableOptions.push(`<span style="color:orange">TẤT CẢ ${totalC} tín C → A</span> <strong>VÀ</strong> <span style="color:blue">${neededB} tín B → A</span>`);
+                        }
+                    }
+                    
+                    improvementWarnings.push(`<br>⚠️ Bạn chỉ có ${totalC} tín C (cần ${improveC})`);
+                }
+            } else if (improveC > 0) {
+                improvementWarnings.push(`<br>⚠️ Bạn không có tín chỉ C để cải thiện`);
+            }
+            
+            // Phương án 3: Cải thiện B → A
+            if (totalB > 0) {
+                if (improveB <= totalB) {
+                    viableOptions.push(`<span style="color:blue">${improveB} tín B → A</span>`);
+                } else {
+                    improvementWarnings.push(`<br>⚠️ Bạn chỉ có ${totalB} tín B (thiếu ${improveB - totalB} tín để đạt mục tiêu)`);
+                }
+            } else if (improveB > 0) {
+                improvementWarnings.push(`<br>⚠️ Bạn không có tín chỉ B để cải thiện`);
+            }
+            
+            // Phương án 4: Kết hợp nhiều loại để tối ưu hóa (ưu tiên cải thiện D trước)
+            if (totalD > 0 && totalC > 0 && improveD > totalD) {
+                const pointsFromD = totalD * 3.0;
+                const remainingPoints = stillNeeded - pointsFromD;
+                const neededC = Math.ceil(Math.min(remainingPoints / 2.0, totalC));
+                const pointsFromC = neededC * 2.0;
+                
+                if (remainingPoints - pointsFromC > 0 && totalB > 0) {
+                    const neededB = Math.ceil((remainingPoints - pointsFromC) / 1.0);
+                    if (neededB <= totalB) {
+                        viableOptions.push(`<span style="color:red">TẤT CẢ ${totalD} tín D → A</span> <strong>VÀ</strong> <span style="color:orange">${neededC} tín C → A</span> <strong>VÀ</strong> <span style="color:blue">${neededB} tín B → A</span>`);
+                    }
+                }
+            }
+            
+            // Tính toán GPA tối đa có thể đạt khi sử dụng tất cả tín còn lại để học A
+            // và cải thiện tất cả D, C và B nếu cần
+            const allRemainingAsA = remaining * 4.0;
+            const allD = totalD * 3.0; // Cải thiện từ 1.0 lên 4.0
+            const allC = totalC * 2.0; // Cải thiện từ 2.0 lên 4.0
+            const allB = totalB * 1.0; // Cải thiện từ 3.0 lên 4.0
+            
+            const maxPossiblePoints = currentTotalPoints + allRemainingAsA + allD + allC + allB;
+            const maxPossibleGPA = (maxPossiblePoints / totalMajorCredits).toFixed(2);
+            
+            // Hiển thị kết quả dựa trên các phương án khả thi
+            if (viableOptions.length === 0) {
+                resultHTML += `<p>❌ <strong>Xuất sắc:</strong> Không thể đạt Xuất sắc với số tín chỉ hiện có.<br>
+                → Cần đạt A cho tất cả ${remaining} tín còn lại và cải thiện các môn cũ, nhưng:<br>
+                ${improvementWarnings.join('')}<br>
+                → GPA tối đa có thể đạt: <strong>${maxPossibleGPA}</strong></p>`;
+            } else {
+                resultHTML += `<p>⚠️ <strong>Xuất sắc:</strong> Cần đạt A cho <strong>TẤT CẢ</strong> ${remaining} tín còn lại<br>
+                → <strong>VÀ</strong> cải thiện một trong những trường hợp sau:<br>
+                ${viableOptions.join(', hoặc<br>')}<br>
+                → GPA dự kiến sau cải thiện: <strong>${expectedGPAXuatSac}</strong>
+                ${improvementWarnings.join('')}</p>`;
+            }
+        } else {
+            // Trường hợp tính toán không đúng hoặc dữ liệu không hợp lệ
+            resultHTML += `<p>⚠️ <strong>Xuất sắc:</strong> Có lỗi khi tính toán. Vui lòng kiểm tra dữ liệu đầu vào.</p>`;
+        }
     }
     
     // Hiển thị kết quả
@@ -406,7 +639,6 @@ fetchDiemButton.addEventListener('click', () => {
 
 // Xử lý sự kiện khi nhấn nút "Phân loại tính chỉ"
 fetchPLButton.addEventListener('click', () => {
-    displayCurrentSummary();
     displayCreditsByType();
 });
 
