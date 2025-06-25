@@ -1,0 +1,33 @@
+{
+  "manifest_version": 3,
+  "name": "SGU Token ",
+  "version": "2.0.4",
+  "description": "Phân tích điểm và tính toán thông tin học tập tại SGU.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "webRequest",
+    "webRequestBlocking", 
+    "storage",
+    "clipboardWrite"
+  ],
+  "host_permissions": [
+    "https://thongtindaotao.daihocsaigon.edu.vn/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/pikachu.png",
+      "48": "icons/pikachu.png",
+      "128": "icons/pikachu.png"
+    }
+  },
+  "icons": {
+    "16": "icons/pikachu.png",
+    "48": "icons/pikachu.png",
+    "128": "icons/pikachu.png"
+  }
+}

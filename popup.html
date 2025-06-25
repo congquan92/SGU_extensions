@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SGU Score Analyzer</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            margin: 0;
+            padding: 10px;
+            width: 500px !important; /* Giảm chiều rộng để tránh tràn */
+            min-height: 200px;
+            background-color: #f4f6f9;
+            color: #333;
+            font-size: 14px;
+            line-height: 1.5;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 16px; /* Giảm kích thước tiêu đề cho phù hợp popup */
+            color: #2c3e50;
+            text-align: center;
+            margin: 0 0 10px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .section {
+            margin-bottom: 10px;
+            background-color: #fff;
+            padding: 10px;
+            border-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+
+        .section h2 {
+            font-size: 14px;
+            color: #34495e;
+            margin: 0 0 8px;
+            font-weight: bold;
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 6px;
+            margin-bottom: 6px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            padding: 6px 10px;
+            margin: 4px 4px 4px 0;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: #2980b9;
+        }
+
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
+        }
+
+        #status {
+            font-size: 11px;
+            margin: 8px 0;
+            text-align: center;
+            min-height: 16px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+
+        .info-row span:first-child {
+            font-weight: bold;
+            color: #34495e;
+        }
+
+        .semester-accordion {
+            margin-bottom: 8px;
+        }
+
+        .accordion-header {
+            width: 100%;
+            background-color: #ecf0f1;
+            color: #2c3e50;
+            padding: 8px;
+            text-align: left;
+            border: none;
+            border-radius: 3px;
+            font-size: 13px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s;
+        }
+
+        .accordion-header:hover, .accordion-header.active {
+            background-color: #dfe4ea;
+        }
+
+        .accordion-header .icon {
+            font-size: 10px;
+        }
+
+        .accordion-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+            padding: 0 8px;
+            background-color: #fff;
+        }
+
+        .accordion-content table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 8px 0;
+            font-size: 11px;
+        }
+
+        .accordion-content th, .accordion-content td {
+            border: 1px solid #ddd;
+            padding: 4px;
+            text-align: left;
+        }
+
+        .accordion-content th {
+            background-color: #f1f3f5;
+            color: #2c3e50;
+            font-weight: bold;
+        }
+
+        .accordion-content td {
+            color: #333;
+        }
+
+        #semesterDetailsContainer {
+            display: none;
+        }
+
+        #toggleDetailViewButton {
+            width: 100%;
+            background-color: #e67e22;
+            margin-top: 4px;
+        }
+
+        #toggleDetailViewButton:hover {
+            background-color: #d35400;
+        }
+
+        .credits-by-type {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 3px;
+        }
+
+        .credits-by-type span {
+            font-size: 12px;
+        }
+
+        .credits-by-type span:first-child {
+            font-weight: bold;
+        }
+
+        @media (max-width: 380px) {
+            body {
+                padding: 8px;
+                width: 100%;
+            }
+
+            button {
+                padding: 5px 8px;
+                font-size: 11px;
+            }
+
+            .info-row {
+                font-size: 11px;
+            }
+
+            .accordion-content table {
+                font-size: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>SGU Score</h1>
+
+    <div class="section" id="tokenSection">
+        <h2>Token</h2>
+        <input type="text" id="tokenInput" placeholder="Dán Bearer Token tại đây">
+        <button id="fetchTokenButton">Lấy Token</button>
+        <button id="copyTokenButton">Sao chép</button>
+        <button id="saveTokenButton">Lưu token</button>
+        <button id="removeTokenButton">Xóa token</button>
+    </div>
+
+    <div class="section" id="actionSection">
+        <h2>Thao tác</h2>
+        <button id="fetchScoresButton" disabled>Chạy</button>
+        <button id="fetch_diem">Tính điểm</button>
+    </div>
+
+    <div id="status"></div>
+
+    <div class="section" id="currentSummarySection" style="display: none;">
+        <h2>Tổng Kết Hiện Tại (<span id="currentSemester"></span>)</h2>
+        <div class="info-row">
+            <span>ĐTB Học kỳ (Hệ 10):</span>
+            <span id="currentDTB10">0</span>
+        </div>
+        <div class="info-row">
+            <span>ĐTB Học kỳ (Hệ 4):</span>
+            <span id="currentDTB4">0</span>
+        </div>
+        <div class="info-row">
+            <span>Tổng tín chỉ học kỳ:</span>
+            <span id="currentTinChi">0</span>
+        </div>
+        <div class="info-row">
+            <span>Xếp loại học kỳ:</span>
+            <span id="currentXepLoai"></span>
+        </div>
+    </div>
+
+
+    <script src="popup.js"></script>
+</body>
+</html>
