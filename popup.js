@@ -4,9 +4,12 @@ const copyTokenButton = document.getElementById('copyTokenButton');
 const saveTokenButton = document.getElementById('saveTokenButton');
 const removeTokenButton = document.getElementById('removeTokenButton');
 const fetchScoresButton = document.getElementById('fetchScoresButton');
-const fetchDiemButton = document.getElementById('fetch_diem'); // Nút mới
+const fetchDiemButton = document.getElementById('fetch_diem'); 
+const fetchPLButton = document.getElementById('fetch_PL');
 const statusDiv = document.getElementById('status');
 
+let currentTinChi = 0;
+let currentDTB4 = 0;
 let dataCraw = null; 
 let currentAuthToken = ''; 
 
@@ -32,6 +35,7 @@ function setStatus(message, type = 'info') {
 function updateFetchScoresButtonState() {
     fetchScoresButton.disabled = !currentAuthToken;
     fetchDiemButton.disabled = !dataCraw; // Nút "Tính điểm" chỉ hoạt động khi có dataCraw
+    fetchPLButton.disabled = !dataCraw; // Nút "Phân loại tính chỉ" chỉ hoạt động khi có dataCraw
 }
 
 // Hàm khởi tạo khi popup mở
@@ -65,9 +69,8 @@ fetchTokenButton.addEventListener('click', async () => {
         updateFetchScoresButtonState();
         return;
     } else if (tokenInput.value) {
-        // Nếu người dùng dán nhưng thiếu "Bearer "
         currentAuthToken = tokenInput.value;
-        setStatus('Đã lấy token từ ô nhập liệu (thiếu "Bearer ").', 'warning');
+        setStatus('Đã lấy token từ ô nhập liệu.', 'success');
         updateFetchScoresButtonState();
         return;
     }
@@ -157,12 +160,8 @@ async function getStudentScores() {
         }
 
         const data = await response.json();
-
-        console.log("Dữ liệu thô từ API:", data);
-        console.log("Dữ liệu API ds hoc kỳ:", data.data.ds_diem_hocky);
-        console.log("Dữ liệu API ds điểm các môn học :", (data.data.ds_diem_hocky).map(hk => hk.ds_diem_mon_hoc));
         setStatus('Đã tải điểm thành công! Kiểm tra console.', 'success');
-        dataCraw = data; // Lưu dữ liệu vào biến toàn cục để sử dụng sau này
+        dataCraw = data; 
         updateFetchScoresButtonState(); // Cập nhật trạng thái nút "Tính điểm" sau khi có dữ liệu
         return data;
 
@@ -204,6 +203,8 @@ function displayCurrentSummary() {
             document.getElementById('currentTinChi').textContent = diemHocky.so_tin_chi_dat_tich_luy;
             document.getElementById('currentXepLoai').textContent = calculateXepLoai(diemHocky.dtb_tich_luy_he_4);
             document.getElementById('currentSemester').textContent = diemHocky.ten_hoc_ky;
+            currentTinChi = diemHocky.so_tin_chi_dat_tich_luy;
+            currentDTB4 = diemHocky.dtb_tich_luy_he_4;
             break; // Chỉ hiển thị tổng kết của học kỳ đầu tiên có dữ liệu
        }
     }
@@ -211,13 +212,205 @@ function displayCurrentSummary() {
     document.getElementById('currentSummarySection').style.display = 'block';
 }
 
+// Hàm phân loại tín chỉ
+function displayCreditsByType() {
+    let l_A = 0;
+    let l_B = 0;
+    let l_C = 0;
+    let l_D = 0;
+    let l_F = 0;
+
+    const dsDiem = (dataCraw.data.ds_diem_hocky).flatMap(hk => hk.ds_diem_mon_hoc);
+    console.log("Dữ liệu điểm các môn học:", dsDiem);
+    for (let i = 0; i < dsDiem.length; i++) {
+        const diemMonHoc = dsDiem[i];
+        if (diemMonHoc.ket_qua == 1) {
+            const tinChi = parseInt(diemMonHoc.so_tin_chi) || 0; // Đảm bảo là số, nếu không có thì 0
+            switch (diemMonHoc.diem_tk_chu) {
+                case 'A':
+                    l_A += tinChi;
+                    break;
+                case 'B':
+                    l_B += tinChi;
+                    break;
+                case 'C':
+                    l_C += tinChi;
+                    break;
+                case 'D':
+                    l_D += tinChi;
+                    break;
+                case 'F': // Mặc dù là đậu, nhưng nếu có F thì vẫn tính
+                    l_F += tinChi;
+                    break;
+                default:
+                    // Bỏ qua các trường hợp không xác định hoặc không có điểm chữ
+                    break;
+            }
+        }
+    }
+    totalA.textContent = l_A;
+    totalB.textContent = l_B;
+    totalC.textContent = l_C;
+    totalD.textContent = l_D;
+    totalF.textContent = l_F;
+    
+    document.getElementById('creditsByTypeSection').style.display = 'block'; //
+    setStatus('Đã hiển thị phân loại tín chỉ.', 'success');
+}
+
+function predictButton(){
+    // Lấy tổng số tín chỉ ngành từ input
+    const totalMajorCredits = parseInt(document.getElementById('input_Pre').value);
+    const statusPredict = document.getElementById('status_Predict');
+    const remainingCredits = document.getElementById('display_sotin_conlai');
+    
+    // Kiểm tra đầu vào
+    if (!totalMajorCredits || isNaN(totalMajorCredits) || totalMajorCredits <= 0) {
+        setStatus('Vui lòng nhập số tín chỉ ngành hợp lệ.', 'error');
+        remainingCredits.textContent = "0";
+        return;
+    }
+    
+    // Lấy dữ liệu hiện tại
+    const currentCredits = parseFloat(currentTinChi) || 0;
+    const currentGPA = parseFloat(currentDTB4) || 0;
+    
+    // Tính số tín chỉ còn lại
+    const remaining = totalMajorCredits - currentCredits;
+    remainingCredits.textContent = remaining.toString();
+    
+    // Tính tổng điểm hiện tại
+    const currentTotalPoints = currentCredits * currentGPA;
+    
+    // Điểm cần đạt cho từng xếp loại
+    const targetGioi = 3.2;
+    const targetXuatsac = 3.6;
+    
+    // Tổng điểm cần có để đạt từng loại
+    const totalPointsNeededForGioi = totalMajorCredits * targetGioi;
+    const totalPointsNeededForXuatsac = totalMajorCredits * targetXuatsac;
+    
+    // Điểm cần thêm cho từng loại
+    const pointsNeededForGioi = totalPointsNeededForGioi - currentTotalPoints;
+    const pointsNeededForXuatsac = totalPointsNeededForXuatsac - currentTotalPoints;
+    
+    // Điểm trung bình cần đạt cho các tín chỉ còn lại
+    const avgNeededForGioi = (remaining > 0) ? pointsNeededForGioi / remaining : 0;
+    const avgNeededForXuatsac = (remaining > 0) ? pointsNeededForXuatsac / remaining : 0;
+    
+    let resultHTML = "";
+    
+    // Phân tích kết quả đạt GIỎI
+    if (currentGPA >= targetGioi) {
+        resultHTML += `<p>💚 <strong>Giỏi:</strong> Bạn đã đạt đủ điều kiện xếp loại Giỏi với ĐTB hiện tại ${currentGPA.toFixed(2)}</p>`;
+    } else if (remaining <= 0) {
+        resultHTML += `<p>❌ <strong>Giỏi:</strong> Đã hoàn thành đủ tín chỉ nhưng ĐTB ${currentGPA.toFixed(2)} chưa đạt mức Giỏi (3.2)</p>`;
+    } else if (avgNeededForGioi <= 4.0) {
+        // Tính toán số tín A và B cần thiết
+        const creditsA = Math.ceil((pointsNeededForGioi - remaining * 3.0) / 1.0);
+        const creditsB = remaining - creditsA;
+        
+        if (creditsA <= remaining) {
+            // Tính GPA dự kiến khi đạt được số tín A và B theo đề xuất
+            const expectedPointsWithAB = currentTotalPoints + (creditsA * 4.0) + (creditsB * 3.0);
+            const expectedGPAGioi = (expectedPointsWithAB / totalMajorCredits).toFixed(2);
+            
+            resultHTML += `<p>✅ <strong>Giỏi:</strong> Cần ĐTB ${avgNeededForGioi.toFixed(2)} cho ${remaining} tín còn lại.<br>
+            → Cụ thể: <span style="color:blue">${creditsA} tín A</span> và <span style="color:blue">${creditsB} tín B</span><br>
+            → GPA dự kiến: <strong>${expectedGPAGioi}</strong></p>`;
+        }
+    } else {
+        // Cần cải thiện điểm cũ
+        const maxPointsFromRemaining = remaining * 4.0; // Nếu tất cả A
+        const stillNeeded = pointsNeededForGioi - maxPointsFromRemaining;
+        const improveD = Math.ceil(stillNeeded / 3.0); // D→A: +3 điểm/tín
+        const improveC = Math.ceil(stillNeeded / 2.0); // C→A: +2 điểm/tín
+        const improveB = Math.ceil(stillNeeded / 1.0); // B→A: +1 điểm/tín
+        
+        // Tính GPA dự kiến nếu đạt được tất cả điều kiện cải thiện
+        const expectedPointsAfterImprovement = currentTotalPoints + maxPointsFromRemaining + stillNeeded;
+        const expectedGPAGioi = (expectedPointsAfterImprovement / totalMajorCredits).toFixed(2);
+        
+        resultHTML += `<p>⚠️ <strong>Giỏi:</strong> Cần đạt A cho tất cả ${remaining} tín còn lại<br>
+        → <strong>VÀ</strong> cải thiện một trong những trường hợp sau:<br>
+        <span style="color:red">${improveD} tín D → A</span>, hoặc<br>
+        <span style="color:orange">${improveC} tín C → A</span>, hoặc<br>
+        <span style="color:blue">${improveB} tín B → A</span><br>
+        → GPA dự kiến sau cải thiện: <strong>${expectedGPAGioi}</strong></p>`;
+    }
+    
+    // Phân tích kết quả đạt XUẤT SẮC
+    if (currentGPA >= targetXuatsac) {
+        resultHTML += `<p>💙 <strong>Xuất sắc:</strong> Bạn đã đạt đủ điều kiện xếp loại Xuất sắc với ĐTB hiện tại ${currentGPA.toFixed(2)}</p>`;
+    } else if (remaining <= 0) {
+        resultHTML += `<p>❌ <strong>Xuất sắc:</strong> Đã hoàn thành đủ tín chỉ nhưng ĐTB ${currentGPA.toFixed(2)} chưa đạt mức Xuất sắc (3.6)</p>`;
+    } else if (avgNeededForXuatsac <= 4.0) {
+        resultHTML += `<p>✅ <strong>Xuất sắc:</strong> Cần ĐTB ${avgNeededForXuatsac.toFixed(2)} cho ${remaining} tín còn lại.<br>`;
+        
+        if (avgNeededForXuatsac > 3.9) {
+            // Tính GPA khi gần như toàn điểm A
+            const expectedPointsWithAllA = currentTotalPoints + (remaining * 4.0);
+            const expectedGPAXuatSac = (expectedPointsWithAllA / totalMajorCredits).toFixed(2);
+            
+            resultHTML += `→ Cần gần như toàn bộ điểm A cho các tín chỉ còn lại<br>
+            → GPA dự kiến: <strong>${expectedGPAXuatSac}</strong></p>`;
+        } else {
+            // Tính toán số tín A và B cần thiết để đạt Xuất sắc
+            const creditsA = Math.ceil((pointsNeededForXuatsac - remaining * 3.0) / 1.0);
+            const creditsB = remaining - creditsA;
+            
+            // Tính GPA dự kiến
+            const expectedPointsWithAB = currentTotalPoints + (creditsA * 4.0) + (creditsB * 3.0);
+            const expectedGPAXuatSac = (expectedPointsWithAB / totalMajorCredits).toFixed(2);
+            
+            resultHTML += `→ Cụ thể: <span style="color:blue">${creditsA} tín A</span> và <span style="color:blue">${creditsB} tín B</span><br>
+            → GPA dự kiến: <strong>${expectedGPAXuatSac}</strong></p>`;
+        }
+    } else {
+        // Cần cải thiện điểm cũ
+        const maxPointsFromRemaining = remaining * 4.0; // Nếu tất cả A
+        const stillNeeded = pointsNeededForXuatsac - maxPointsFromRemaining;
+        const improveD = Math.ceil(stillNeeded / 3.0); // D→A: +3 điểm/tín
+        const improveC = Math.ceil(stillNeeded / 2.0); // C→A: +2 điểm/tín
+        const improveB = Math.ceil(stillNeeded / 1.0); // B→A: +1 điểm/tín
+        
+        // Tính GPA dự kiến nếu đạt được tất cả điều kiện cải thiện
+        const expectedPointsAfterImprovement = currentTotalPoints + maxPointsFromRemaining + stillNeeded;
+        const expectedGPAXuatSac = (expectedPointsAfterImprovement / totalMajorCredits).toFixed(2);
+        
+        resultHTML += `<p>⚠️ <strong>Xuất sắc:</strong> Cần đạt A cho <strong>TẤT CẢ</strong> ${remaining} tín còn lại<br>
+        → <strong>VÀ</strong> cải thiện một trong những trường hợp sau:<br>
+        <span style="color:red">${improveD} tín D → A</span>, hoặc<br>
+        <span style="color:orange">${improveC} tín C → A</span>, hoặc<br>
+        <span style="color:blue">${improveB} tín B → A</span><br>
+        → GPA dự kiến sau cải thiện: <strong>${expectedGPAXuatSac}</strong></p>`;
+    }
+    
+    // Hiển thị kết quả
+    statusPredict.innerHTML = resultHTML;
+    
+    // Hiển thị thông báo
+    setStatus('Đã dự đoán chi tiết về khả năng đạt loại tốt nghiệp', 'success');
+}
+
+
 // Xử lý sự kiện khi nhấn nút "Chạy"
 fetchScoresButton.addEventListener('click', () => {
     getStudentScores();
 });
 
-// Xử lý sự kiện khi nhấn nút "Tính điểm"
+// Xử lý sự kiện khi nhấn nút "Tổng Kết Điểm Hiện Tại"
 fetchDiemButton.addEventListener('click', () => {
     displayCurrentSummary();
-    console.log("hello");
-});    
+});
+
+// Xử lý sự kiện khi nhấn nút "Phân loại tính chỉ"
+fetchPLButton.addEventListener('click', () => {
+    displayCurrentSummary();
+    displayCreditsByType();
+});
+
+// Xử lý sự kiện khi nhấn nút "Dự đoán"
+document.getElementById('predictButton').addEventListener('click', () => {
+   predictButton(); 
+});

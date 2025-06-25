@@ -175,8 +175,8 @@
             font-size: 12px;
         }
 
-        .credits-by-type span:first-child {
-            font-weight: bold;
+        span {
+            font-size: 12px;
         }
 
         @media (max-width: 380px) {
@@ -214,12 +214,14 @@
 
     <div class="section" id="actionSection">
         <h2>Thao tác</h2>
-        <button id="fetchScoresButton" disabled>Chạy</button>
-        <button id="fetch_diem">Tính điểm</button>
+        <button id="fetchScoresButton" disabled>Load Dữ liệu</button>
+        <button id="fetch_diem">Tổng Kết Điểm Hiện Tại</button>
+        <button id="fetch_PL">Phân Loại Tính Chỉ</button>
     </div>
 
     <div id="status"></div>
 
+    <!-- Tổng kết hiện tại -->
     <div class="section" id="currentSummarySection" style="display: none;">
         <h2>Tổng Kết Hiện Tại (<span id="currentSemester"></span>)</h2>
         <div class="info-row">
@@ -240,7 +242,32 @@
         </div>
     </div>
 
+    <!-- Phân loại tín chỉ -->
+    <div class="section" id="creditsByTypeSection" style="display: none;">
+        <h2>Phân loại Tín chỉ</h2>
+            <div class="credits-by-type">
+                <span style="color: blue;">Tín A :</span><span style="color: blue;" id="totalA">0</span>
+                <span style="color: blue;">Tín B :</span><span style="color: blue;" id="totalB">0</span>
+                <span style="color: blue;">Tín C :</span><span style="color: blue;" id="totalC">0</span>
+                <span style="color: red;">Tín D :</span><span style="color: red;" id="totalD">0</span>
+                <span style="color: red;">Tín F :</span><span style="color: red;" id="totalF">0</span>
+            </div>
 
+        <hr/>
+
+        <h2 style="text-align: center;">Dự Đoán</h2>
+        <div style="display: flex; margin-bottom: 15px;">
+            <input value="" type="number" id="input_Pre" placeholder="Tổng tín chỉ ngành của bạn (ví dụ 150)" style="width: 70%; padding: 6px; margin-right: 10px; margin-top: 4px;">
+            <button id="predictButton">Dự đoán</button>
+        </div>
+        <div id="predictionResult" style="margin-top: 10px; font-size: 14px; color: #333;">
+            <div style=" display: grid; grid-template-columns: repeat(2, 1fr); gap: 3px;">
+                <span>Số Tín Chỉ Còn Lại :</span><span id="display_sotin_conlai"></span>
+            </div>
+            <span style="color: #28a745;" id="status_Predict">--</span>
+        </div>
+            
+    </div>
     <script src="popup.js"></script>
 </body>
 </html>
