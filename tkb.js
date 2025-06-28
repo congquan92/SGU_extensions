@@ -4,7 +4,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const nextWeekBtn = document.getElementById('nextWeekBtn');
     const timetableDisplay = document.getElementById('timetableDisplay');
     const statusMessageDiv = document.getElementById('statusMessage');
-     const downloadPngBtn = document.getElementById('downloadPngBtn');
+    const downloadPngBtn = document.getElementById('downloadPngBtn');
+    const downloadIcsBtn = document.getElementById('downloadIcsBtn')
 
     let allTkbData = []; // To store all weeks of TKB data
     let dsTietTrongNgay = []; // To store period details
@@ -171,6 +172,135 @@ document.addEventListener('DOMContentLoaded', () => {
             setStatusMessage('Lỗi khi tải xuống hình ảnh TKB.', 'error');
         });
     });
+
+     // **********************************************
+    //  Logic tải xuống ICS
+    // **********************************************
+     downloadIcsBtn.addEventListener('click', () => {
+        setStatusMessage('Đang tạo file lịch (.ics) cho tất cả các tuần...', 'info');
+
+        if (!allTkbData || allTkbData.length === 0) {
+            setStatusMessage('Không có dữ liệu thời khóa biểu để xuất.', 'warning');
+            return;
+        }
+
+        let icsContent = `BEGIN:VCALENDAR\r\n`;
+        icsContent += `VERSION:2.0\r\n`;
+        icsContent += `PRODID:-//SGU TKB Viewer//NONSGML v1.0//EN\r\n`;
+        icsContent += `CALSCALE:GREGORIAN\r\n`;
+        icsContent += `METHOD:PUBLISH\r\n`;
+        icsContent += `X-WR-CALNAME:Thời Khóa Biểu SGU\r\n`; // Tên lịch khi nhập vào GG Calendar
+
+        let eventCounter = 0; // Để tạo UID duy nhất cho mỗi sự kiện
+
+        allTkbData.forEach((weekData) => { // Lặp qua TẤT CẢ các tuần
+            let weekStartDateObj = null;
+
+            if (weekData.ngay_bat_dau) {
+                const [d, m, y] = weekData.ngay_bat_dau.split('/').map(Number);
+                weekStartDateObj = new Date(y, m - 1, d);
+                weekStartDateObj.setHours(0,0,0,0);
+            } else {
+                const weekInfoMatch = weekData.thong_tin_tuan ? weekData.thong_tin_tuan.match(/\[từ ngày (.*?) đến ngày .*?\]/) : null;
+                const startDateString = weekInfoMatch ? weekInfoMatch[1] : '';
+                if (startDateString) {
+                    // Cần xác định năm cho ngày bắt đầu nếu chỉ có ngày/tháng.
+                    // Sử dụng năm của ngày hiện tại hoặc năm của tuần đầu tiên trong TKB.
+                    // Để đơn giản và tránh lỗi năm cũ/mới, có thể lấy năm từ tuần đầu tiên
+                    // hoặc giả định năm hiện tại nếu không có thông tin cụ thể.
+                    // Tốt nhất là API nên trả về năm trong ngay_bat_dau hoặc thong_tin_tuan.
+                    // Tạm thời, ta có thể lấy năm của tuần đầu tiên nếu ngay_bat_dau không có.
+                    let year = new Date().getFullYear();
+                    if (allTkbData.length > 0 && allTkbData[0].ngay_bat_dau) {
+                        year = parseInt(allTkbData[0].ngay_bat_dau.split('/')[2]);
+                    }
+                    const [startDay, startMonth] = startDateString.split('/').map(Number);
+                    weekStartDateObj = new Date(year, startMonth - 1, startDay);
+                    weekStartDateObj.setHours(0,0,0,0);
+                }
+            }
+
+            if (!weekStartDateObj || !weekData.ds_thoi_khoa_bieu || weekData.ds_thoi_khoa_bieu.length === 0) {
+                console.warn(`Bỏ qua tuần: ${weekData.thong_tin_tuan || 'Không rõ thông tin'} do thiếu ngày bắt đầu hoặc dữ liệu TKB.`);
+                return; // Bỏ qua tuần này và chuyển sang tuần tiếp theo
+            }
+
+            weekData.ds_thoi_khoa_bieu.forEach((lesson) => { // Lặp qua các buổi học trong mỗi tuần
+                const lessonDateObj = getDateForDay(weekStartDateObj, lesson.thu_kieu_so);
+                const startPeriodTimes = getPeriodTimes(lesson.tiet_bat_dau);
+                const endPeriodTimes = getPeriodTimes(lesson.tiet_bat_dau + lesson.so_tiet - 1);
+
+                if (lessonDateObj && startPeriodTimes && endPeriodTimes) {
+                    const startDateTime = new Date(
+                        lessonDateObj.getFullYear(),
+                        lessonDateObj.getMonth(),
+                        lessonDateObj.getDate(),
+                        parseInt(startPeriodTimes.start.split(':')[0]),
+                        parseInt(startPeriodTimes.start.split(':')[1])
+                    );
+                    const endDateTime = new Date(
+                        lessonDateObj.getFullYear(),
+                        lessonDateObj.getMonth(),
+                        lessonDateObj.getDate(),
+                        parseInt(endPeriodTimes.end.split(':')[0]),
+                        parseInt(endPeriodTimes.end.split(':')[1])
+                    );
+
+                    const icsStart = formatIcsDateTime(startDateTime);
+                    const icsEnd = formatIcsDateTime(endDateTime);
+                    
+                    eventCounter++; // Tăng bộ đếm để đảm bảo UID duy nhất
+                    // UID nên đủ ngẫu nhiên hoặc chứa thông tin duy nhất
+                    const uid = `${Date.now()}-${eventCounter}-${lesson.ma_mon}-${lesson.thu_kieu_so}-${lesson.tiet_bat_dau}`;
+
+                    icsContent += `BEGIN:VEVENT\r\n`;
+                    icsContent += `UID:${uid}\r\n`;
+                    icsContent += `DTSTAMP:${formatIcsDateTime(new Date())}Z\r\n`; // Timestamp của lúc tạo event (UTC)
+                    icsContent += `DTSTART;TZID=Asia/Ho_Chi_Minh:${icsStart}\r\n`; // Giờ địa phương + TZID
+                    icsContent += `DTEND;TZID=Asia/Ho_Chi_Minh:${icsEnd}\r\n`;   // Giờ địa phương + TZID
+                    icsContent += `SUMMARY:${lesson.ten_mon || 'Không có tên môn'}\r\n`;
+                    if (lesson.ma_phong) {
+                        icsContent += `LOCATION:${lesson.ma_phong}\r\n`;
+                    }
+                    let description = `Mã môn: ${lesson.ma_mon || 'N/A'}`;
+                    if (lesson.ten_giang_vien) {
+                        description += `\\nGiảng viên: ${lesson.ten_giang_vien}`;
+                    }
+                    if (weekData.thong_tin_tuan) {
+                        description += `\\nTuần: ${weekData.thong_tin_tuan}`; // Thêm thông tin tuần vào mô tả
+                    }
+                    icsContent += `DESCRIPTION:${description.replace(/(\r\n|\n|\r)/gm, " ")}\r\n`; // Xóa bỏ ký tự xuống dòng không mong muốn
+                    icsContent += `END:VEVENT\r\n`;
+                }
+            });
+        });
+
+        icsContent += `END:VCALENDAR\r\n`;
+
+        // Tạo và tải xuống file .ics
+        const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `TKB_SGU_ToanBo_Lich.ics`; // Đổi tên file để phản ánh tất cả các tuần
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        setStatusMessage('Đã tạo và tải xuống file lịch (.ics) cho tất cả các tuần thành công!', 'success');
+    });
+
+    // Hàm định dạng ngày giờ cho ICS (YYYYMMDDTHHMMSS)
+    function formatIcsDateTime(dateObj) {
+        const year = dateObj.getFullYear();
+        const month = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+        const day = dateObj.getDate().toString().padStart(2, '0');
+        const hours = dateObj.getHours().toString().padStart(2, '0');
+        const minutes = dateObj.getMinutes().toString().padStart(2, '0');
+        const seconds = dateObj.getSeconds().toString().padStart(2, '0');
+        return `${year}${month}${day}T${hours}${minutes}${seconds}`;
+    }
 
 
     function getDayName(dayOfWeek) {

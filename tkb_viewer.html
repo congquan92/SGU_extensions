@@ -26,16 +26,15 @@
         margin-bottom: 25px;
         font-size: 2em;
       }
-      /* Cập nhật style cho khu vực điều khiển tuần */
       .week-controls {
         display: flex;
-        justify-content: space-between; /* Căn giữa và phân phối không gian */
+        justify-content: space-between;
         align-items: center;
         margin-bottom: 25px;
         padding: 10px 0;
         border-bottom: 1px solid #eee;
-        flex-wrap: wrap; /* Cho phép xuống dòng trên màn hình nhỏ */
-        gap: 10px; /* Khoảng cách giữa các phần tử */
+        flex-wrap: wrap;
+        gap: 10px;
       }
       .week-controls button {
         background-color: #3498db;
@@ -46,7 +45,7 @@
         cursor: pointer;
         font-size: 1em;
         transition: background-color 0.2s ease;
-        flex-shrink: 0; /* Không co lại */
+        flex-shrink: 0;
       }
       .week-controls button:hover {
         background-color: #2980b9;
@@ -62,8 +61,8 @@
         font-size: 1em;
         background-color: white;
         cursor: pointer;
-        flex-grow: 1; /* Cho phép dropdown mở rộng */
-        min-width: 150px; /* Đảm bảo dropdown đủ rộng */
+        flex-grow: 1;
+        min-width: 150px;
       }
       .week-controls select:focus {
         outline: none;
@@ -81,16 +80,15 @@
         border-radius: 6px;
         padding: 15px;
       }
-      /* Style cho ngày hiện tại */
       .current-day {
-        border: 2px solid #2ecc71 !important; /* Viền nổi bật */
-        /* background-color: #e6ffe6 !important; Nền xanh nhạt */
-        box-shadow: 0 0 10px rgba(46, 204, 113, 0.3); /* Hiệu ứng bóng */
+        border: 2px solid #2ecc71 !important;
+        background-color: #e6ffe6 !important;
+        box-shadow: 0 0 10px rgba(46, 204, 113, 0.3);
       }
-      /* .current-day .day-header {
+      .current-day .day-header {
         border-bottom-color: #2ecc71 !important;
-        color: #dd8718 !important;
-      } */
+        color: #27ae60 !important;
+      }
 
       .day-header {
         font-size: 1.3em;
@@ -140,26 +138,78 @@
         border-radius: 5px;
       }
       .export-buttons {
-        /* Thêm style cho phần nút export */
         text-align: center;
         margin-top: 30px;
         padding-top: 20px;
         border-top: 1px solid #eee;
+        display: flex;
+        justify-content: center;
+        gap: 15px;
+        flex-wrap: wrap;
       }
-      #downloadPngBtn {
-        /* Style cho nút download PNG */
-        background-color: #e74c3c; /* Màu đỏ */
-        color: white;
+      .export-buttons button {
         border: none;
         padding: 12px 25px;
         border-radius: 5px;
         cursor: pointer;
         font-size: 1.1em;
         transition: background-color 0.2s ease;
+        flex-shrink: 0;
+      }
+      #downloadPngBtn {
+        background-color: #e74c3c;
+        color: white;
       }
       #downloadPngBtn:hover {
-        background-color: #c0392b; /* Màu đỏ đậm hơn khi hover */
+        background-color: #c0392b;
       }
+      #downloadIcsBtn {
+        background-color: #f39c12;
+        color: white;
+      }
+      #downloadIcsBtn:hover {
+        background-color: #e67e22;
+      }
+
+      .user-guide {
+        /* Style cho phần hướng dẫn */
+        margin-top: 40px;
+        padding: 25px;
+        background-color: #eaf6f7;
+        border: 1px solid #cce7e8;
+        border-radius: 8px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+      }
+      .user-guide h2 {
+        color: #2c3e50;
+        text-align: center;
+        margin-bottom: 20px;
+        font-size: 1.6em;
+        border-bottom: 1px solid #ccc;
+        padding-bottom: 10px;
+      }
+      .user-guide ol {
+        padding-left: 25px;
+        margin-bottom: 15px;
+      }
+      .user-guide li {
+        margin-bottom: 10px;
+        font-size: 1em;
+        color: #444;
+      }
+      .user-guide li strong {
+        color: #34495e;
+      }
+      .user-guide .note {
+        font-style: italic;
+        color: #7f8c8d;
+        margin-top: 15px;
+        padding: 10px;
+        background-color: #f0f8ff;
+        border-left: 3px solid #3498db;
+        border-radius: 4px;
+      }
+
       footer {
         text-align: center;
         margin-top: 40px;
@@ -176,15 +226,13 @@
         font-weight: bold;
         background-color: #d4edda;
         color: #155724;
-        /* display: none; Hidden by default */
+        display: none;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Thời Khóa Biểu Sinh Viên</h1>
-
-      <div id="statusMessage" class="status-message"></div>
+      <h1>Thời Khóa Biểu Học Sinh - Sinh Viên</h1>
 
       <div class="week-controls">
         <button id="prevWeekBtn">&lt; Tuần Trước</button>
@@ -192,13 +240,86 @@
         <button id="nextWeekBtn">Tuần Tiếp &gt;</button>
       </div>
 
+      <div id="statusMessage" class="status-message"></div>
+
       <div id="timetableDisplay" class="timetable-section"></div>
 
       <div class="export-buttons">
         <button id="downloadPngBtn">Tải xuống TKB (.png)</button>
+        <button id="downloadIcsBtn">Tải xuống lịch (.ics)</button>
       </div>
+
+      <div class="user-guide">
+        <h2>Hướng Dẫn Sử Dụng</h2>
+        <ol>
+          <!-- <li>
+            <strong>Tải Thời Khóa Biểu:</strong> Sử dụng tiện ích mở rộng trên
+            trang chính để tải dữ liệu Thời khóa biểu của bạn. Nếu chưa có dữ
+            liệu, bạn sẽ thấy thông báo "Không tìm thấy dữ liệu".
+          </li>
+          <li>
+            <strong>Điều hướng Tuần:</strong>
+            <ul>
+              <li>
+                Sử dụng nút <strong>&lt; Tuần Trước</strong> và
+                <strong>Tuần Tiếp &gt;</strong> để di chuyển giữa các tuần.
+              </li>
+              <li>
+                Sử dụng ô chọn tuần (Dropdown) để chuyển nhanh đến một tuần cụ
+                thể.
+              </li>
+            </ul>
+          </li> -->
+          <li>
+            <strong>Ngày Hiện Tại:</strong> Ngày hôm nay sẽ được làm nổi bật với
+            viền màu xanh lá cây để bạn dễ dàng theo dõi.
+          </li>
+          <li>
+            <strong>Tải xuống Thời khóa biểu dưới dạng ảnh (.png):</strong>
+            <ul>
+              <li>
+                Nhấn nút <strong>"Tải xuống TKB (.png)"</strong> để lưu thời
+                khóa biểu của tuần đang hiển thị thành một file ảnh PNG vào máy
+                tính của bạn.
+              </li>
+              <li>Bạn có thể chia sẻ ảnh này hoặc in ra.</li>
+            </ul>
+          </li>
+          <li>
+            <strong>Tải xuống lịch (.ics) và nhập vào Google Lịch:</strong>
+            <ol>
+              <li>
+                Nhấn nút <strong>"Tải xuống lịch (.ics)"</strong> để lưu file
+                lịch (iCalendar) vào máy tính của bạn.
+              </li>
+              <li>
+                Mở Google Lịch trên trình duyệt web của bạn:
+                <a href="https://calendar.google.com/calendar/u/0/r/settings/export" target="_blank"
+                  >Google Calendar</a
+                >
+              </li>
+              <li>
+                Dưới phần " <strong>Import</strong>", Click vào
+                <strong>Select file from your computer</strong> và chọn file
+                `.ics` mà bạn vừa tải xuống.
+              </li>
+              <li>Click vào nút <strong>Import</strong>.</li>
+              <li>
+               Toàn bộ các môn học trong thời khóa biểu đã được thêm vào Google
+                Lịch của bạn.
+              </li>
+            </ol>
+          </li>
+        </ol>
+        <p class="note">
+          <strong>Lưu ý:</strong> Tiện ích mở rộng sẽ tự động cố gắng tìm tuần
+          hiện tại của bạn khi tải dữ liệu. Đảm bảo bạn đã tải dữ liệu TKB mới
+          nhất thông qua popup chính của tiện ích mở rộng.
+        </p>
+      </div>
+
       <footer>
-        <p>&copy; 2025 SGU TKB Viewer</p>
+        <p>&copy; 2025 SGU TKB </p>
       </footer>
     </div>
 
