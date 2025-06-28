@@ -282,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `TKB_SGU_ToanBo_Lich.ics`; // Đổi tên file để phản ánh tất cả các tuần
+        link.download = `TKB_SGU.ics`; 
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

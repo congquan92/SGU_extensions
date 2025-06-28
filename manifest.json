@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SGU Extension ",
   "version": "2.0.4",
-  "description": "Phân tích điểm và tính toán thông tin học tập tại SGU.",
+  "description": "Hỗ trợ các tính năng tiện ích cho sinh viên SGU - (được mình tạo ra do rảnh rỗi sinh nông nỗi =))",
   "permissions": [
     "activeTab",
     "scripting",
