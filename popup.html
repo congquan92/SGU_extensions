@@ -178,30 +178,19 @@
         span {
             font-size: 12px;
         }
-
-        @media (max-width: 380px) {
-            body {
-                padding: 8px;
-                width: 100%;
-            }
-
-            button {
-                padding: 5px 8px;
-                font-size: 11px;
-            }
-
-            .info-row {
-                font-size: 11px;
-            }
-
-            .accordion-content table {
-                font-size: 10px;
-            }
+        .tkb:hover, .me:hover {
+            color: #3498db;
+            text-decoration: underline;
         }
+
     </style>
 </head>
 <body>
-    <h1>SGU Score</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div style="flex-basis: 33%; text-align: left;font-size: small; cursor: pointer;" class="me">Me</div>
+        <h1 style="text-align: center; margin: 0; flex-basis: 33%;">SGU Extension</h1>
+        <div style="flex-basis: 33%; text-align: right; font-size: small; cursor: pointer;" class="tkb" id="tkb">Xuất File TKB</div>
+    </div>
 
     <div class="section" id="tokenSection">
         <h2>Token</h2>
@@ -251,6 +240,7 @@
                 <span style="color: blue;">Tín C :</span><span style="color: blue;" id="totalC">0</span>
                 <span style="color: red;">Tín D :</span><span style="color: red;" id="totalD">0</span>
                 <span style="color: red;">Tín F :</span><span style="color: red;" id="totalF">0</span>
+                <span style="color: green;">Tổng :</span><span style="color: green;" id="totalTL">0</span>
             </div>
 
         <hr/>

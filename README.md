@@ -47,14 +47,15 @@ SGU_2/
 
 ### 4. Phân Loại Tín Chỉ
 
-- Đếm và hiển thị số tín chỉ đã đạt theo từng loại điểm:
-  - Số tín chỉ loại A (3.6 - 4.0)
-  - Số tín chỉ loại B (3.0 - 3.5)
-  - Số tín chỉ loại C (2.0 - 2.9)
-  - Số tín chỉ loại D (1.0 - 1.9)
-  - Số tín chỉ loại F (0.0 - 0.9)
+- Đếm và hiển thị số tín chỉ đã đạt theo từng loại điểm
+  
 
 ### 5. Dự Đoán Xếp Loại Tốt Nghiệp
+- Tín A:  (4.0 điểm/tín)
+- Tín B:  (3.0 điểm/tín)
+- Tín C: (2.0 điểm/tín)
+- Tín D:  (1.0 điểm/tín)
+- Tín F: (0.0 điểm/tín)
 
 Phân tích khả năng đạt xếp loại Giỏi (ĐTB ≥ 3.2) và Xuất sắc (ĐTB ≥ 3.6) dựa trên:
 
@@ -63,7 +64,6 @@ Phân tích khả năng đạt xếp loại Giỏi (ĐTB ≥ 3.2) và Xuất s�
 - Số tín chỉ theo từng loại điểm có thể cải thiện
 
 Tính năng này đưa ra các phương án khả thi và thực tế để sinh viên đạt được xếp loại mong muốn:
-
 - Tính toán điểm trung bình cần đạt cho các môn còn lại
 - Đề xuất số tín chỉ loại A và B cần đạt
 - Nếu chỉ đạt A cho tất cả các môn còn lại vẫn chưa đủ:

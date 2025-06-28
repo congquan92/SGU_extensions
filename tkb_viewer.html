@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Xem Thời Khóa Biểu</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        margin: 20px;
+        background-color: #f4f7f6;
+        color: #333;
+        line-height: 1.6;
+      }
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        background-color: #ffffff;
+        padding: 30px;
+        border-radius: 8px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      }
+      h1 {
+        color: #2c3e50;
+        text-align: center;
+        margin-bottom: 25px;
+        font-size: 2em;
+      }
+      /* Cập nhật style cho khu vực điều khiển tuần */
+      .week-controls {
+        display: flex;
+        justify-content: space-between; /* Căn giữa và phân phối không gian */
+        align-items: center;
+        margin-bottom: 25px;
+        padding: 10px 0;
+        border-bottom: 1px solid #eee;
+        flex-wrap: wrap; /* Cho phép xuống dòng trên màn hình nhỏ */
+        gap: 10px; /* Khoảng cách giữa các phần tử */
+      }
+      .week-controls button {
+        background-color: #3498db;
+        color: white;
+        border: none;
+        padding: 10px 18px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1em;
+        transition: background-color 0.2s ease;
+        flex-shrink: 0; /* Không co lại */
+      }
+      .week-controls button:hover {
+        background-color: #2980b9;
+      }
+      .week-controls button:disabled {
+        background-color: #cccccc;
+        cursor: not-allowed;
+      }
+      .week-controls select {
+        padding: 8px 12px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 1em;
+        background-color: white;
+        cursor: pointer;
+        flex-grow: 1; /* Cho phép dropdown mở rộng */
+        min-width: 150px; /* Đảm bảo dropdown đủ rộng */
+      }
+      .week-controls select:focus {
+        outline: none;
+        border-color: #3498db;
+        box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+      }
+
+      .timetable-section {
+        margin-top: 20px;
+      }
+      .day-timetable {
+        margin-bottom: 25px;
+        background-color: #f9f9f9;
+        border: 1px solid #e0e0e0;
+        border-radius: 6px;
+        padding: 15px;
+      }
+      /* Style cho ngày hiện tại */
+      .current-day {
+        border: 2px solid #2ecc71 !important; /* Viền nổi bật */
+        /* background-color: #e6ffe6 !important; Nền xanh nhạt */
+        box-shadow: 0 0 10px rgba(46, 204, 113, 0.3); /* Hiệu ứng bóng */
+      }
+      /* .current-day .day-header {
+        border-bottom-color: #2ecc71 !important;
+        color: #dd8718 !important;
+      } */
+
+      .day-header {
+        font-size: 1.3em;
+        color: #34495e;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 2px solid #3498db;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .day-header span {
+        font-weight: bold;
+      }
+      .day-header .date {
+        font-size: 0.8em;
+        color: #7f8c8d;
+        font-weight: normal;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 10px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: left;
+      }
+      th {
+        background-color: #ecf0f1;
+        color: #2c3e50;
+        font-weight: bold;
+        text-transform: uppercase;
+        font-size: 0.9em;
+      }
+      tr:nth-child(even) {
+        background-color: #f6f6f6;
+      }
+      .no-schedule {
+        text-align: center;
+        color: #7f8c8d;
+        font-style: italic;
+        padding: 20px;
+        background-color: #f0f0f0;
+        border-radius: 5px;
+      }
+      .export-buttons {
+        /* Thêm style cho phần nút export */
+        text-align: center;
+        margin-top: 30px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+      }
+      #downloadPngBtn {
+        /* Style cho nút download PNG */
+        background-color: #e74c3c; /* Màu đỏ */
+        color: white;
+        border: none;
+        padding: 12px 25px;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 1.1em;
+        transition: background-color 0.2s ease;
+      }
+      #downloadPngBtn:hover {
+        background-color: #c0392b; /* Màu đỏ đậm hơn khi hover */
+      }
+      footer {
+        text-align: center;
+        margin-top: 40px;
+        font-size: 0.85em;
+        color: #7f8c8d;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+      }
+      .status-message {
+        text-align: center;
+        margin-top: 20px;
+        padding: 10px;
+        border-radius: 5px;
+        font-weight: bold;
+        background-color: #d4edda;
+        color: #155724;
+        /* display: none; Hidden by default */
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Thời Khóa Biểu Sinh Viên</h1>
+
+      <div id="statusMessage" class="status-message"></div>
+
+      <div class="week-controls">
+        <button id="prevWeekBtn">&lt; Tuần Trước</button>
+        <select id="weekSelect"></select>
+        <button id="nextWeekBtn">Tuần Tiếp &gt;</button>
+      </div>
+
+      <div id="timetableDisplay" class="timetable-section"></div>
+
+      <div class="export-buttons">
+        <button id="downloadPngBtn">Tải xuống TKB (.png)</button>
+      </div>
+      <footer>
+        <p>&copy; 2025 SGU TKB Viewer</p>
+      </footer>
+    </div>
+
+    <script src="html2canvas.min.js"></script>
+    <script src="tkb.js"></script>
+  </body>
+</html>
