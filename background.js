@@ -7,7 +7,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         // Dựa vào hình ảnh, API bạn muốn lấy token là w-locsinhvieninfo,
         // và các API khác như w-locdsdiemsinhvien cũng dùng chung Authorization header.
         // Do đó, chúng ta sẽ lắng nghe tất cả các request đến /api/
-        if (details.url.startsWith("https://thongtindaotao.daihocsaigon.edu.vn/api/")) {
+        if (details.url.startsWith("https://thongtindaotao.sgu.edu.vn/public/api")) {
             for (let i = 0; i < details.requestHeaders.length; ++i) {
                 // Tìm header Authorization
                 if (details.requestHeaders[i].name === 'Authorization') {
@@ -24,7 +24,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         }
         return { requestHeaders: details.requestHeaders };
     },
-    { urls: ["https://thongtindaotao.sgu.edu.vn/*"] }, // Lọc URL cho tất cả các yêu cầu từ domain này
+    { urls: ["https://thongtindaotao.sgu.edu.vn/public/api/*"] }, // Lọc URL cho tất cả các yêu cầu từ domain này
     ["requestHeaders"] // Yêu cầu quyền truy cập vào request headers
 );
 

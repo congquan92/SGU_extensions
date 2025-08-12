@@ -11,7 +11,7 @@
     "storage",
     "clipboardWrite"
   ],
-  "host_permissions": ["https://thongtindaotao.sgu.edu.vn/*"],
+  "host_permissions": ["https://thongtindaotao.sgu.edu.vn/public/api*"],
   "background": {
     "service_worker": "background.js"
   },
