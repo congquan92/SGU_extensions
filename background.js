@@ -24,7 +24,7 @@ chrome.webRequest.onBeforeSendHeaders.addListener(
         }
         return { requestHeaders: details.requestHeaders };
     },
-    { urls: ["https://thongtindaotao.daihocsaigon.edu.vn/*"] }, // Lọc URL cho tất cả các yêu cầu từ domain này
+    { urls: ["https://thongtindaotao.sgu.edu.vn/*"] }, // Lọc URL cho tất cả các yêu cầu từ domain này
     ["requestHeaders"] // Yêu cầu quyền truy cập vào request headers
 );
 

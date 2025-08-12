@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "SGU Extension ",
   "version": "2.0.4",
-  "description": "Hỗ trợ các tính năng tiện ích cho sinh viên SGU - (được mình tạo ra do rảnh rỗi sinh nông nỗi =))",
+  "description": "Hỗ trợ các tính năng tiện ích cho sinh viên SGU - (được mình tạo ra do rảnh rỗi sinh nông nỗi =)) )",
   "permissions": [
     "activeTab",
     "scripting",
@@ -11,7 +11,7 @@
     "storage",
     "clipboardWrite"
   ],
-  "host_permissions": ["https://thongtindaotao.daihocsaigon.edu.vn/*"],
+  "host_permissions": ["https://thongtindaotao.sgu.edu.vn/*"],
   "background": {
     "service_worker": "background.js"
   },
