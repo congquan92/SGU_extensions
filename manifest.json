@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "SGU Extension ",
-  "version": "2.0.4",
-  "description": "Hỗ trợ các tính năng tiện ích cho sinh viên SGU - (được mình tạo ra do rảnh rỗi sinh nông nỗi =)) )",
+  "name": "SGU Extension Enhanced",
+  "version": "2.1.0",
+  "description": "Hỗ trợ các tính năng tiện ích cho sinh viên SGU với nhiều cải tiến mới - Enhanced version with improved features and security",
   "permissions": [
     "activeTab",
     "scripting",

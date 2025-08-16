@@ -6,12 +6,37 @@ const removeTokenButton = document.getElementById("removeTokenButton");
 const fetchScoresButton = document.getElementById("fetchScoresButton");
 const fetchDiemButton = document.getElementById("fetch_diem");
 const fetchPLButton = document.getElementById("fetch_PL");
+const exportReportButton = document.getElementById("exportReportButton");
+const clearCacheButton = document.getElementById("clearCacheButton");
+const showStatisticsButton = document.getElementById("showStatisticsButton");
 const statusDiv = document.getElementById("status");
 
 let currentTinChi = 0;
 let currentDTB4 = 0;
 let dataCraw = null;
 let currentAuthToken = "";
+
+// Cache để tránh gọi API nhiều lần
+let cachedSemesterData = null;
+let cacheExpiry = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 phút
+
+// Validation và mã hóa token đơn giản
+function encryptToken(token) {
+  return btoa(token); // Base64 encode - cơ bản nhưng tốt hơn plaintext
+}
+
+function decryptToken(encryptedToken) {
+  try {
+    return atob(encryptedToken);
+  } catch (e) {
+    return encryptedToken; // Fallback nếu không mã hóa
+  }
+}
+
+function validateToken(token) {
+  return token && token.length > 20 && !token.includes(' '); // Validation cơ bản
+}
 
 // Hàm cập nhật trạng thái
 function setStatus(message, type = "info") {
@@ -28,7 +53,28 @@ function setStatus(message, type = "info") {
   } else if (type === "warning") {
     statusDiv.style.color = "#856404";
     statusDiv.style.backgroundColor = "#fff3cd";
+  } else if (type === "loading") {
+    statusDiv.style.color = "#0c5460";
+    statusDiv.style.backgroundColor = "#d1ecf1";
   }
+}
+
+// Loading state management
+function setLoadingState(isLoading, buttonId = null) {
+  const buttons = buttonId ? [document.getElementById(buttonId)] : 
+    [fetchTokenButton, fetchScoresButton, fetchDiemButton, fetchPLButton];
+  
+  buttons.forEach(button => {
+    if (button) {
+      button.disabled = isLoading;
+      if (isLoading) {
+        button.dataset.originalText = button.textContent;
+        button.textContent = "Đang xử lý...";
+      } else {
+        button.textContent = button.dataset.originalText || button.textContent;
+      }
+    }
+  });
 }
 
 // Cập nhật trạng thái của nút "Chạy" dựa trên việc có token hay không
@@ -36,70 +82,126 @@ function updateFetchScoresButtonState() {
   fetchScoresButton.disabled = !currentAuthToken;
   fetchDiemButton.disabled = !dataCraw; // Nút "Tính điểm" chỉ hoạt động khi có dataCraw
   fetchPLButton.disabled = !dataCraw; // Nút "Phân loại tính chỉ" chỉ hoạt động khi có dataCraw
+  exportReportButton.disabled = !dataCraw; // Nút "Xuất báo cáo" chỉ hoạt động khi có dataCraw
 }
 
 // Hàm khởi tạo khi popup mở
 document.addEventListener("DOMContentLoaded", async () => {
-  // Thử lấy token đã bắt được từ storage ngay khi popup mở
-  const result = await chrome.storage.local.get("capturedAuthToken");
-  if (result.capturedAuthToken) {
-    currentAuthToken = result.capturedAuthToken;
-    tokenInput.value = currentAuthToken;
-    setStatus("Token đã sẵn sàng từ phiên trước.", "success");
-  } else {
-    // Nếu không có token đã bắt được, thử lấy token đã lưu thủ công trước đó
-    const manualTokenResult = await chrome.storage.local.get("manualAuthToken");
-    if (manualTokenResult.manualAuthToken) {
-      currentAuthToken = manualTokenResult.manualAuthToken;
-      tokenInput.value = currentAuthToken;
-      setStatus("Token đã lưu thủ công đã sẵn sàng.", "success");
+  setLoadingState(true);
+  
+  try {
+    // Thử lấy token đã bắt được từ storage ngay khi popup mở
+    const result = await chrome.storage.local.get("capturedAuthToken");
+    if (result.capturedAuthToken) {
+      currentAuthToken = decryptToken(result.capturedAuthToken);
+      
+      if (validateToken(currentAuthToken)) {
+        tokenInput.value = currentAuthToken;
+        setStatus("Token đã sẵn sàng từ phiên trước.", "success");
+      } else {
+        setStatus("Token không hợp lệ, vui lòng lấy token mới.", "warning");
+        currentAuthToken = "";
+      }
     } else {
-      setStatus(
-        "Không có token. Vui lòng lấy token hoặc dán thủ công.",
-        "info"
-      );
+      // Nếu không có token đã bắt được, thử lấy token đã lưu thủ công trước đó
+      const manualTokenResult = await chrome.storage.local.get("manualAuthToken");
+      if (manualTokenResult.manualAuthToken) {
+        currentAuthToken = decryptToken(manualTokenResult.manualAuthToken);
+        
+        if (validateToken(currentAuthToken)) {
+          tokenInput.value = currentAuthToken;
+          setStatus("Token đã lưu thủ công đã sẵn sàng.", "success");
+        } else {
+          setStatus("Token đã lưu không hợp lệ.", "warning");
+          currentAuthToken = "";
+        }
+      } else {
+        setStatus("Không có token. Vui lòng lấy token hoặc dán thủ công.", "info");
+      }
     }
+    
+    // Kiểm tra cache dữ liệu điểm
+    const cachedData = await chrome.storage.local.get(["cachedScoreData", "cacheTimestamp"]);
+    if (cachedData.cachedScoreData && cachedData.cacheTimestamp) {
+      const now = Date.now();
+      if (now - cachedData.cacheTimestamp < CACHE_DURATION) {
+        dataCraw = cachedData.cachedScoreData;
+        setStatus("Đã tải dữ liệu điểm từ cache.", "success");
+      }
+    }
+    
+  } catch (error) {
+    console.error("Lỗi khi khởi tạo:", error);
+    setStatus("Có lỗi khi khởi tạo. Vui lòng thử lại.", "error");
+  } finally {
+    updateFetchScoresButtonState();
+    setLoadingState(false);
   }
-  updateFetchScoresButtonState();
 });
 
 // Xử lý sự kiện khi nhấn nút "Lấy Token" (kết hợp tự động và thủ công)
 fetchTokenButton.addEventListener("click", async () => {
-  // Ưu tiên lấy từ input nếu người dùng đã dán
-  if (tokenInput.value && tokenInput.value.startsWith("Bearer ")) {
-    currentAuthToken = tokenInput.value.replace("Bearer ", "");
-    setStatus("Đã lấy token từ ô nhập liệu.", "success");
-    updateFetchScoresButtonState();
-    return;
-  } else if (tokenInput.value) {
-    currentAuthToken = tokenInput.value;
-    setStatus("Đã lấy token từ ô nhập liệu.", "success");
-    updateFetchScoresButtonState();
-    return;
-  }
+  setLoadingState(true, "fetchTokenButton");
+  
+  try {
+    // Ưu tiên lấy từ input nếu người dùng đã dán
+    if (tokenInput.value && tokenInput.value.startsWith("Bearer ")) {
+      const token = tokenInput.value.replace("Bearer ", "");
+      if (validateToken(token)) {
+        currentAuthToken = token;
+        await chrome.storage.local.set({ 
+          manualAuthToken: encryptToken(token),
+          tokenTimestamp: Date.now()
+        });
+        setStatus("Đã lấy và lưu token từ ô nhập liệu.", "success");
+        updateFetchScoresButtonState();
+        return;
+      } else {
+        setStatus("Token không hợp lệ. Vui lòng kiểm tra lại.", "error");
+        return;
+      }
+    } else if (tokenInput.value) {
+      if (validateToken(tokenInput.value)) {
+        currentAuthToken = tokenInput.value;
+        await chrome.storage.local.set({ 
+          manualAuthToken: encryptToken(tokenInput.value),
+          tokenTimestamp: Date.now()
+        });
+        setStatus("Đã lấy và lưu token từ ô nhập liệu.", "success");
+        updateFetchScoresButtonState();
+        return;
+      } else {
+        setStatus("Token không hợp lệ. Vui lòng kiểm tra lại.", "error");
+        return;
+      }
+    }
 
-  // Nếu input rỗng, cố gắng lấy token tự động từ background script
-  setStatus(
-    "Đang chờ token được bắt từ phiên hoạt động... Vui lòng tải lại trang SGU nếu chưa thấy.",
-    "info"
-  );
-  fetchScoresButton.disabled = true;
+    // Nếu input rỗng, cố gắng lấy token tự động từ background script
+    setStatus("Đang chờ token được bắt từ phiên hoạt động...", "loading");
 
-  const response = await chrome.runtime.sendMessage({
-    action: "getCapturedToken",
-  });
-  if (response && response.token) {
-    currentAuthToken = response.token;
-    tokenInput.value = currentAuthToken;
-    setStatus("Đã lấy token tự động thành công từ phiên hoạt động!", "success");
-  } else {
-    setStatus(
-      "Chưa có token được bắt. Đảm bảo bạn đã đăng nhập và một API đã gửi token.",
-      "warning"
-    );
-    currentAuthToken = "";
+    const response = await chrome.runtime.sendMessage({
+      action: "getCapturedToken",
+    });
+    
+    if (response && response.token && validateToken(response.token)) {
+      currentAuthToken = response.token;
+      tokenInput.value = currentAuthToken;
+      await chrome.storage.local.set({ 
+        capturedAuthToken: encryptToken(response.token),
+        tokenTimestamp: Date.now()
+      });
+      setStatus("Đã lấy token tự động thành công từ phiên hoạt động!", "success");
+    } else {
+      setStatus("Chưa có token được bắt hoặc token không hợp lệ. Đảm bảo bạn đã đăng nhập và một API đã gửi token.", "warning");
+      currentAuthToken = "";
+    }
+  } catch (error) {
+    console.error("Lỗi khi lấy token:", error);
+    setStatus("Có lỗi khi lấy token. Vui lòng thử lại.", "error");
+  } finally {
+    updateFetchScoresButtonState();
+    setLoadingState(false, "fetchTokenButton");
   }
-  updateFetchScoresButtonState();
 });
 
 // Xử lý sự kiện sao chép token
@@ -143,51 +245,105 @@ removeTokenButton.addEventListener("click", async () => {
 });
 
 // --- Hàm lấy dữ liệu điểm từ API ---
-async function getStudentScores() {
-  const apiUrl =
-    "https://thongtindaotao.daihocsaigon.edu.vn/api/srm/w-locdsdiemsinhvien?hien_thi_mon_theo_hkdk=false";
+async function getStudentScores(useCache = true) {
+  const apiUrl = "https://thongtindaotao.sgu.edu.vn/api/srm/w-locdsdiemsinhvien?hien_thi_mon_theo_hkdk=false";
 
   if (!currentAuthToken) {
     setStatus("Vui lòng lấy token trước khi tải điểm.", "error");
     return null;
   }
 
-  setStatus("Đang tải dữ liệu điểm...", "info");
-
-  try {
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${currentAuthToken}`, // SỬ DỤNG TOKEN ĐÃ LẤY
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: JSON.stringify({}),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(
-        `Lỗi HTTP khi tải điểm: ${response.status} - ${response.statusText}`,
-        errorText
-      );
-      setStatus(
-        `Lỗi tải điểm: ${response.status} - ${response.statusText}`,
-        "error"
-      );
-      return null;
+  // Kiểm tra cache trước
+  if (useCache) {
+    const cachedData = await chrome.storage.local.get(["cachedScoreData", "cacheTimestamp"]);
+    if (cachedData.cachedScoreData && cachedData.cacheTimestamp) {
+      const now = Date.now();
+      if (now - cachedData.cacheTimestamp < CACHE_DURATION) {
+        dataCraw = cachedData.cachedScoreData;
+        setStatus("Đã tải điểm từ cache (tiết kiệm băng thông).", "success");
+        updateFetchScoresButtonState();
+        return dataCraw;
+      }
     }
-
-    const data = await response.json();
-    setStatus("Đã tải điểm thành công!", "success");
-    dataCraw = data;
-    updateFetchScoresButtonState(); // Cập nhật trạng thái nút "Tính điểm" sau khi có dữ liệu
-    return data;
-  } catch (error) {
-    console.error("Có lỗi xảy ra khi lấy dữ liệu API điểm:", error);
-    setStatus(`Lỗi khi lấy dữ liệu điểm: ${error.message}`, "error");
-    return null;
   }
+
+  setStatus("Đang tải dữ liệu điểm từ server...", "loading");
+  setLoadingState(true, "fetchScoresButton");
+
+  // Retry logic
+  let attempts = 0;
+  const maxAttempts = 3;
+  
+  while (attempts < maxAttempts) {
+    try {
+      attempts++;
+      
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${currentAuthToken}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setStatus("Token đã hết hạn. Vui lòng lấy token mới.", "error");
+          currentAuthToken = "";
+          tokenInput.value = "";
+          updateFetchScoresButtonState();
+          return null;
+        }
+        
+        const errorText = await response.text();
+        console.error(`Lỗi HTTP khi tải điểm: ${response.status} - ${response.statusText}`, errorText);
+        
+        if (attempts === maxAttempts) {
+          setStatus(`Lỗi tải điểm sau ${maxAttempts} lần thử: ${response.status}`, "error");
+          return null;
+        } else {
+          setStatus(`Lần thử ${attempts}/${maxAttempts} thất bại. Đang thử lại...`, "warning");
+          await new Promise(resolve => setTimeout(resolve, 1000 * attempts)); // Exponential backoff
+          continue;
+        }
+      }
+
+      const data = await response.json();
+      
+      // Validate dữ liệu trả về
+      if (!data || !data.data || !data.data.ds_diem_hocky) {
+        setStatus("Dữ liệu trả về không hợp lệ.", "error");
+        return null;
+      }
+      
+      // Lưu vào cache
+      await chrome.storage.local.set({
+        cachedScoreData: data,
+        cacheTimestamp: Date.now()
+      });
+      
+      setStatus("Đã tải điểm thành công!", "success");
+      dataCraw = data;
+      updateFetchScoresButtonState();
+      return data;
+      
+    } catch (error) {
+      console.error(`Lần thử ${attempts}: Có lỗi xảy ra khi lấy dữ liệu API điểm:`, error);
+      
+      if (attempts === maxAttempts) {
+        setStatus(`Lỗi khi lấy dữ liệu điểm: ${error.message}`, "error");
+        return null;
+      } else {
+        setStatus(`Lần thử ${attempts}/${maxAttempts} thất bại. Đang thử lại...`, "warning");
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempts));
+      }
+    }
+  }
+  
+  setLoadingState(false, "fetchScoresButton");
+  return null;
 }
 // Hàm  xếp loại
 function calculateXepLoai(dtb) {
@@ -750,7 +906,7 @@ function predictButton() {
 
 // "Load Dữ liệu"
 fetchScoresButton.addEventListener("click", () => {
-  getStudentScores();
+  getStudentScores(false); // Force reload from server
 });
 
 // "Tổng Kết Điểm Hiện Tại"
@@ -772,14 +928,225 @@ document.getElementById("predictButton").addEventListener("click", () => {
   predictButton();
 });
 
+// "Xuất báo cáo PDF"
+exportReportButton.addEventListener("click", async () => {
+  if (!dataCraw) {
+    setStatus("Không có dữ liệu để xuất báo cáo.", "warning");
+    return;
+  }
+  
+  setLoadingState(true, "exportReportButton");
+  setStatus("Đang tạo báo cáo PDF...", "loading");
+  
+  try {
+    const reportContent = generateReportContent();
+    await generatePDF(reportContent);
+    setStatus("Đã xuất báo cáo PDF thành công!", "success");
+  } catch (error) {
+    console.error("Lỗi khi xuất PDF:", error);
+    setStatus("Có lỗi khi xuất báo cáo PDF.", "error");
+  } finally {
+    setLoadingState(false, "exportReportButton");
+  }
+});
+
+// "Xóa Cache"
+clearCacheButton.addEventListener("click", async () => {
+  try {
+    await chrome.storage.local.remove(["cachedScoreData", "cacheTimestamp"]);
+    dataCraw = null;
+    updateFetchScoresButtonState();
+    setStatus("Đã xóa cache thành công.", "success");
+  } catch (error) {
+    console.error("Lỗi khi xóa cache:", error);
+    setStatus("Có lỗi khi xóa cache.", "error");
+  }
+});
+
+// Hàm tạo nội dung báo cáo
+function generateReportContent() {
+  if (!dataCraw) return "";
+  
+  const dsDiemHocky = dataCraw.data.ds_diem_hocky;
+  let currentSemester = "";
+  let currentDTB10 = 0;
+  let currentDTB4 = 0;
+  let currentTinChi = 0;
+  
+  // Lấy thông tin học kỳ gần nhất
+  for (let i = 0; i < dsDiemHocky.length; i++) {
+    const diemHocky = dsDiemHocky[i];
+    if (diemHocky.so_tin_chi_dat_hk && diemHocky.so_tin_chi_dat_tich_luy) {
+      currentSemester = diemHocky.ten_hoc_ky;
+      currentDTB10 = diemHocky.dtb_tich_luy_he_10;
+      currentDTB4 = diemHocky.dtb_tich_luy_he_4;
+      currentTinChi = diemHocky.so_tin_chi_dat_tich_luy;
+      break;
+    }
+  }
+  
+  // Tính phân loại tín chỉ
+  let l_A = 0, l_B = 0, l_C = 0, l_D = 0, l_F = 0;
+  const dsDiem = dsDiemHocky.flatMap(hk => hk.ds_diem_mon_hoc);
+  
+  for (let i = 0; i < dsDiem.length; i++) {
+    const diemMonHoc = dsDiem[i];
+    if (diemMonHoc.ket_qua == 1) {
+      const tinChi = parseInt(diemMonHoc.so_tin_chi) || 0;
+      switch (diemMonHoc.diem_tk_chu) {
+        case "A": l_A += tinChi; break;
+        case "B": l_B += tinChi; break;
+        case "C": l_C += tinChi; break;
+        case "D": l_D += tinChi; break;
+        case "F": l_F += tinChi; break;
+      }
+    }
+  }
+  
+  return `
+    <h1>BÁO CÁO KẾT QUẢ HỌC TẬP</h1>
+    <h2>Đại học Sài Gòn (SGU)</h2>
+    <hr>
+    
+    <h3>Tổng kết hiện tại (${currentSemester})</h3>
+    <table border="1" style="width:100%; border-collapse: collapse;">
+      <tr><td><strong>ĐTB Học kỳ (Hệ 10)</strong></td><td>${currentDTB10}</td></tr>
+      <tr><td><strong>ĐTB Học kỳ (Hệ 4)</strong></td><td>${currentDTB4}</td></tr>
+      <tr><td><strong>Tổng tín chỉ tích lũy</strong></td><td>${currentTinChi}</td></tr>
+      <tr><td><strong>Xếp loại hiện tại</strong></td><td>${calculateXepLoai(currentDTB4)}</td></tr>
+    </table>
+    
+    <h3>Phân loại tín chỉ</h3>
+    <table border="1" style="width:100%; border-collapse: collapse;">
+      <tr><td><strong>Tín chỉ loại A</strong></td><td style="color: blue;">${l_A}</td></tr>
+      <tr><td><strong>Tín chỉ loại B</strong></td><td style="color: blue;">${l_B}</td></tr>
+      <tr><td><strong>Tín chỉ loại C</strong></td><td style="color: blue;">${l_C}</td></tr>
+      <tr><td><strong>Tín chỉ loại D</strong></td><td style="color: red;">${l_D}</td></tr>
+      <tr><td><strong>Tín chỉ loại F</strong></td><td style="color: red;">${l_F}</td></tr>
+      <tr><td><strong>Tổng cộng</strong></td><td style="color: green;"><strong>${l_A + l_B + l_C + l_D + l_F}</strong></td></tr>
+    </table>
+    
+    <hr>
+    <p><em>Báo cáo được tạo bởi SGU Extension vào ${new Date().toLocaleString('vi-VN')}</em></p>
+  `;
+}
+
+// Hàm tạo PDF (sử dụng window.print với CSS tùy chỉnh)
+async function generatePDF(content) {
+  const printWindow = window.open('', '_blank');
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Báo cáo kết quả học tập</title>
+        <style>
+          body { font-family: Arial, sans-serif; margin: 20px; }
+          table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f2f2f2; }
+          h1, h2 { text-align: center; color: #2c3e50; }
+          h3 { color: #34495e; margin-top: 20px; }
+          hr { margin: 20px 0; }
+          @media print {
+            body { margin: 0; }
+            button { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        ${content}
+        <br><br>
+        <button onclick="window.print()">In báo cáo</button>
+        <button onclick="window.close()">Đóng</button>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+// "Hiển thị thống kê"
+showStatisticsButton.addEventListener("click", () => {
+  displayAdvancedStatistics();
+});
+
+// Hàm hiển thị thống kê nâng cao
+function displayAdvancedStatistics() {
+  if (!dataCraw) {
+    setStatus("Không có dữ liệu để tính thống kê.", "warning");
+    return;
+  }
+
+  const dsDiem = dataCraw.data.ds_diem_hocky.flatMap(hk => hk.ds_diem_mon_hoc);
+  const validScores = dsDiem.filter(d => d.diem_tk_he_10 !== null && d.diem_tk_he_10 !== "");
+  
+  if (validScores.length === 0) {
+    setStatus("Không có dữ liệu điểm hợp lệ để thống kê.", "warning");
+    return;
+  }
+
+  // Tính xu hướng điểm (so sánh 3 học kỳ gần nhất)
+  const semesters = dataCraw.data.ds_diem_hocky.filter(hk => 
+    hk.dtb_hk_he_4 && hk.dtb_hk_he_4 !== ""
+  ).slice(0, 3);
+  
+  let trendText = "Không đủ dữ liệu";
+  if (semesters.length >= 2) {
+    const recent = parseFloat(semesters[0].dtb_hk_he_4);
+    const previous = parseFloat(semesters[1].dtb_hk_he_4);
+    
+    if (recent > previous) {
+      trendText = "📈 Tăng (" + (recent - previous).toFixed(2) + ")";
+    } else if (recent < previous) {
+      trendText = "📉 Giảm (" + (previous - recent).toFixed(2) + ")";
+    } else {
+      trendText = "➡️ Ổn định";
+    }
+  }
+
+  // Tìm môn học xuất sắc nhất và cần cải thiện nhất
+  const passedSubjects = validScores.filter(d => d.ket_qua == 1);
+  let bestSubject = "Không có";
+  let worstSubject = "Không có";
+  
+  if (passedSubjects.length > 0) {
+    const sortedByScore = passedSubjects.sort((a, b) => 
+      parseFloat(b.diem_tk_he_10) - parseFloat(a.diem_tk_he_10)
+    );
+    
+    bestSubject = `${sortedByScore[0].ten_mon_hoc} (${sortedByScore[0].diem_tk_he_10})`;
+    worstSubject = `${sortedByScore[sortedByScore.length - 1].ten_mon_hoc} (${sortedByScore[sortedByScore.length - 1].diem_tk_he_10})`;
+  }
+
+  // Tính tỷ lệ đậu
+  const totalSubjects = validScores.length;
+  const passedSubjectsCount = passedSubjects.length;
+  const passRate = totalSubjects > 0 ? ((passedSubjectsCount / totalSubjects) * 100).toFixed(1) + "%" : "0%";
+
+  // Hiển thị kết quả
+  document.getElementById("trendIndicator").textContent = trendText;
+  document.getElementById("bestSubject").textContent = bestSubject;
+  document.getElementById("worstSubject").textContent = worstSubject;
+  document.getElementById("passRate").textContent = passRate;
+  document.getElementById("statisticsSection").style.display = "block";
+  
+  setStatus("Đã hiển thị thống kê nâng cao.", "success");
+}
+
 // --- CẬP NHẬT PHẦN NÀY ---
 async function getSemester() {
-  const apiURL =
-    "https://thongtindaotao.daihocsaigon.edu.vn/api/sch/w-locdshockytkbuser";
+  const apiURL = "https://thongtindaotao.sgu.edu.vn/api/sch/w-locdshockytkbuser";
+  
   if (!currentAuthToken) {
     setStatus("Vui lòng lấy token trước khi tải học kỳ.", "error");
     return null;
   }
+
+  // Kiểm tra cache
+  if (cachedSemesterData && cacheExpiry && Date.now() < cacheExpiry) {
+    return cachedSemesterData;
+  }
+
+  setStatus("Đang tải thông tin học kỳ...", "loading");
+  
   const payload = {
     filter: { is_tieng_anh: null },
     additional: {
@@ -787,6 +1154,7 @@ async function getSemester() {
       ordering: [{ name: "hoc_ky", order_type: 1 }],
     },
   };
+
   try {
     const response = await fetch(apiURL, {
       method: "POST",
@@ -797,28 +1165,28 @@ async function getSemester() {
       },
       body: JSON.stringify(payload),
     });
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error(
-        `Lỗi HTTP khi tải học kỳ: ${response.status} - ${response.statusText}`,
-        errorText
-      );
+      console.error(`Lỗi HTTP khi tải học kỳ: ${response.status} - ${response.statusText}`, errorText);
+      
       try {
         const errorData = JSON.parse(errorText);
-        setStatus(
-          `Lỗi tải học kỳ: ${errorData.message || response.statusText}`,
-          "error"
-        );
+        setStatus(`Lỗi tải học kỳ: ${errorData.message || response.statusText}`, "error");
       } catch (e) {
-        setStatus(
-          `Lỗi tải học kỳ: ${response.status} - ${response.statusText}`,
-          "error"
-        );
+        setStatus(`Lỗi tải học kỳ: ${response.status} - ${response.statusText}`, "error");
       }
       return null;
     }
+
     const data = await response.json();
-    return data.data.hoc_ky_theo_ngay_hien_tai;
+    const semesterData = data.data.hoc_ky_theo_ngay_hien_tai;
+    
+    // Cache kết quả
+    cachedSemesterData = semesterData;
+    cacheExpiry = Date.now() + CACHE_DURATION;
+    
+    return semesterData;
   } catch (error) {
     console.error("Có lỗi xảy ra khi lấy dữ liệu học kỳ:", error);
     setStatus(`Lỗi khi lấy dữ liệu học kỳ: ${error.message}`, "error");
@@ -828,7 +1196,7 @@ async function getSemester() {
 
 async function fetchTKB(getSemesterResult) {
   const apiUrl =
-    "https://thongtindaotao.daihocsaigon.edu.vn/api/sch/w-locdstkbtuanusertheohocky";
+    "https://thongtindaotao.sgu.edu.vn/api/sch/w-locdstkbtuanusertheohocky";
   if (!currentAuthToken) {
     setStatus("Vui lòng lấy token trước khi tải thời khóa biểu.", "error");
     return null;
@@ -900,19 +1268,35 @@ async function fetchTKB(getSemesterResult) {
 
 // CẬP NHẬT LẮNG NGHE SỰ KIỆN CHO NÚT 'tkb'
 document.getElementById("tkb").addEventListener("click", async () => {
-  setStatus("Đang tải thời khóa biểu...", "info");
-  const getSemesterResult = await getSemester(); // Chờ getSemester hoàn thành
-  console.log("Học kỳ hiện tại:", getSemesterResult);
-  const tkbResult = await fetchTKB(getSemesterResult); // Chờ fetchTKB hoàn thành
-  if (tkbResult) {
-    localStorage.setItem("sguTkbData", JSON.stringify(tkbResult));
-    setStatus("Đã tải TKB thành công. Đang mở tab xem trước...", "success");
-    // Mở tab mới để hiển thị thời khóa biểu
-    chrome.tabs.create({ url: chrome.runtime.getURL("tkb_viewer.html") });
-  } else {
-    setStatus(
-      "Không thể tải thời khóa biểu. Vui lòng kiểm tra lại token hoặc mạng.",
-      "error"
-    );
+  setLoadingState(true);
+  setStatus("Đang tải thời khóa biểu...", "loading");
+  
+  try {
+    const getSemesterResult = await getSemester();
+    if (!getSemesterResult) {
+      setStatus("Không thể lấy thông tin học kỳ hiện tại.", "error");
+      return;
+    }
+    
+    console.log("Học kỳ hiện tại:", getSemesterResult);
+    const tkbResult = await fetchTKB(getSemesterResult);
+    
+    if (tkbResult && tkbResult.length > 0) {
+      localStorage.setItem("sguTkbData", JSON.stringify({
+        ds_tuan_tkb: tkbResult,
+        ds_tiet_trong_ngay: [],
+        timestamp: Date.now()
+      }));
+      
+      setStatus("Đã tải TKB thành công. Đang mở tab xem trước...", "success");
+      chrome.tabs.create({ url: chrome.runtime.getURL("tkb_viewer.html") });
+    } else {
+      setStatus("Không có dữ liệu thời khóa biểu hoặc dữ liệu rỗng.", "warning");
+    }
+  } catch (error) {
+    console.error("Lỗi khi tải TKB:", error);
+    setStatus(`Lỗi khi tải thời khóa biểu: ${error.message}`, "error");
+  } finally {
+    setLoadingState(false);
   }
 });

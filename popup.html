@@ -183,6 +183,47 @@
             text-decoration: underline;
         }
 
+        .loading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+
+        .success-highlight {
+            background-color: #d4edda !important;
+            border-color: #c3e6cb !important;
+        }
+
+        .error-highlight {
+            background-color: #f8d7da !important;
+            border-color: #f5c6cb !important;
+        }
+
+        #exportReportButton {
+            background-color: #17a2b8;
+        }
+
+        #exportReportButton:hover {
+            background-color: #138496;
+        }
+
+        #clearCacheButton {
+            background-color: #6c757d;
+        }
+
+        #clearCacheButton:hover {
+            background-color: #5a6268;
+        }
+
+        #showStatisticsButton {
+            background-color: #28a745;
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        #showStatisticsButton:hover {
+            background-color: #218838;
+        }
+
     </style>
 </head>
 <body>
@@ -206,6 +247,8 @@
         <button id="fetchScoresButton" disabled>Load Dữ liệu</button>
         <button id="fetch_diem">Tổng Kết Điểm Hiện Tại</button>
         <button id="fetch_PL">Phân Loại Tính Chỉ</button>
+        <button id="exportReportButton" disabled>Xuất Báo Cáo PDF</button>
+        <button id="clearCacheButton">Xóa Cache</button>
     </div>
 
     <div id="status"></div>
@@ -258,6 +301,29 @@
         </div>
             
     </div>
+
+    <!-- Phần thống kê nâng cao -->
+    <div class="section" id="statisticsSection" style="display: none;">
+        <h2>Thống Kê Nâng Cao</h2>
+        <div class="info-row">
+            <span>Xu hướng điểm:</span>
+            <span id="trendIndicator">--</span>
+        </div>
+        <div class="info-row">
+            <span>Môn học xuất sắc nhất:</span>
+            <span id="bestSubject">--</span>
+        </div>
+        <div class="info-row">
+            <span>Môn học cần cải thiện:</span>
+            <span id="worstSubject">--</span>
+        </div>
+        <div class="info-row">
+            <span>Tỷ lệ đậu:</span>
+            <span id="passRate">--</span>
+        </div>
+        <button id="showStatisticsButton">Hiển Thị Thống Kê</button>
+    </div>
+
     <script src="popup.js"></script>
 </body>
 </html>
